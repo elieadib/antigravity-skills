@@ -6,9 +6,10 @@ description: >-
   and videos, dual-layer blurred matching backdrops leaving an 80px blurred background margin, custom title sequences
   (centered title + bottom-right date), smooth transitions (cross-dissolves, light leaks, whip pans, film fades),
   untrimmed full-duration video preservation, hardware-accelerated rendering (NVIDIA NVENC, Intel QSV, AMD AMF, Apple VideoToolbox, CPU fallback),
-  and unified Mediterranean filmic color grading. ALWAYS ask the user what text to add on the 1st Cover/title photo
-  (Centered Event Text and bottom-right Date Text) before rendering. Use whenever the user requests to create a slideshow,
-  vacation video, photo montage, cinematic video from photos and videos, or compile travel media into a movie.
+  and unified Mediterranean filmic color grading. ALWAYS ask the user: 1) what folder the photos and videos are located in,
+  and 2) what text to add on the 1st Cover/title photo (Centered Event Text and bottom-right Date Text) before rendering.
+  Use whenever the user requests to create a slideshow, vacation video, photo montage, cinematic video from photos and videos,
+  or compile travel media into a movie.
 ---
 
 # Cinematic Slideshow Agent
@@ -19,14 +20,16 @@ Designed to run seamlessly across all PCs (automatically selecting NVIDIA NVENC,
 
 ---
 
-## ⚠️ MANDATORY WORKFLOW RULE: Cover / Title Photo Customization
+## ⚠️ MANDATORY WORKFLOW RULES: User Inputs Before Rendering
 
-**CRITICAL INSTRUCTION FOR AGENTS - ALWAYS PROMPT THE USER**:
-Before initiating ANY slideshow render (whether running a pilot preview or the full master slideshow), the agent **MUST ALWAYS ASK THE USER** what text to add on the 1st Cover / Title photo:
-1. **Centered Event Text**: A title/phrase describing the event (e.g., *"Summer 2026 - 2 weeks in Crete"*, *"Tuscany Roadtrip 2026"*, *"Family Holidays in Spain"*).
-2. **Bottom-Right Date Text**: The date or date range of the event (e.g., *"Aug 2026"*, *"August 10 – 24, 2026"*, *"July 2026"*).
+**CRITICAL INSTRUCTIONS FOR AGENTS - ALWAYS PROMPT THE USER**:
+Before initiating ANY slideshow processing or rendering (whether running a pilot preview or the full master slideshow), the agent **MUST ALWAYS ASK THE USER**:
+1. **Source Media Folder**: What folder path the photos and videos are located in. Never assume or auto-select a folder path without asking.
+2. **Cover / Title Photo Customization**:
+   - **Centered Event Text**: A title/phrase describing the event (e.g., *"Summer 2026 - 2 weeks in Crete"*, *"Tuscany Roadtrip 2026"*, *"Family Holidays in Spain"*).
+   - **Bottom-Right Date Text**: The date or date range of the event (e.g., *"Aug 2026"*, *"August 10 – 24, 2026"*, *"July 2026"*).
 
-**NEVER** guess, auto-generate, or infer these texts without explicitly asking the user and confirming their choice first!
+**NEVER** guess, auto-generate, or infer folder paths, title text, or date text without explicitly asking the user and confirming their choice first!
 
 ---
 
