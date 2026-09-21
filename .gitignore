@@ -1,0 +1,33 @@
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Temporary and render artifacts
+temp_*/
+*.tmp
+temp_slideshow_render/
+
+# Media exports (prevent committing heavy test videos)
+*.mp4
+*.mkv
+*.avi
+*.mov
