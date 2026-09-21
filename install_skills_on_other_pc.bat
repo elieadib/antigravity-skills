@@ -88,6 +88,7 @@ echo   - Music_Curator           (Download/embed album covers, auto-classify gen
 echo   - music-cue-flac-splitter (Losslessly split unsplit FLAC/APE/WAV from CUE)
 echo   - music-folder-renamer    (Standardize album folder names)
 echo   - music-track-renamer     (Standardize audio track filenames)
+echo   - Tag_as_AI               (Tag music folders/tracks as AI, set AI genres, prefix AI_)
 echo ==============================================================================
 echo.
 echo Any changes or new skills added on any PC will now automatically sync here!

@@ -12,6 +12,7 @@ This repository holds your global skills for **Google Antigravity**, synchronize
 6. **music-cue-flac-splitter**: Recursively scans music directories for unsplit big FLAC, APE, or WAV audio files paired with CUE sheets, losslessly splits them into individual FLAC tracks with embedded Vorbis metadata, and verifies sample-accurate durations.
 7. **music-folder-renamer**: Extracts Band name, Album name, and Year from MP3 and FLAC audio tags, and standardizes album folder names to `BandName - AlbumName - Year - mp3` or `BandName - AlbumName - Year - Flac`.
 8. **music-track-renamer**: Extracts Band name, Album name, and Track name from MP3 and FLAC audio tags, and standardizes all music filenames inside every folder to `BandName - AlbumName - TrackName`.
+9. **Tag_as_AI**: Audits and standardizes audio metadata across music directories or individual tracks to tag them as AI-generated music. Sets Genre tags to designated AI genres (default: `AI_Rock`, or custom e.g. `AI_Jazz`), supports prefixing existing genres with `AI_`, and allows optional AI grouping and comment markers while preserving artwork and audio metadata intact.
 
 ---
 
