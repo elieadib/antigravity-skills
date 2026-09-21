@@ -133,27 +133,27 @@ def render_photo_clip(shot, out_clip, cache_dir, width, height, fps, encoder, en
     motion = shot.get("motion", "zoom_in_center")
 
     if motion == "zoom_in_center":
-        z = 'min(pzoom+0.0006,1.06)'
+        z = 'min(pzoom+0.0019,1.20)'
         x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
     elif motion in ["zoom_out_center", "zoom_out_wide"]:
-        z = 'if(lte(pzoom,1.0),1.06,max(1.002,pzoom-0.0006))'
+        z = 'if(lte(pzoom,1.0),1.20,max(1.01,pzoom-0.0019))'
         x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
     elif motion == "pan_left_to_right":
-        z = '1.06'
-        x = f'(iw/2-(iw/zoom/2))+((on/{frames})-0.5)*(iw*0.04)'
+        z = '1.16'
+        x = f'(iw/2-(iw/zoom/2))+((on/{frames})-0.5)*(iw*0.12)'
         y = 'ih/2-(ih/zoom/2)'
     elif motion == "pan_right_to_left":
-        z = '1.06'
-        x = f'(iw/2-(iw/zoom/2))-((on/{frames})-0.5)*(iw*0.04)'
+        z = '1.16'
+        x = f'(iw/2-(iw/zoom/2))-((on/{frames})-0.5)*(iw*0.12)'
         y = 'ih/2-(ih/zoom/2)'
     elif motion == "push_in_diagonal":
-        z = 'min(pzoom+0.0006,1.06)'
-        x = f'(iw/2-(iw/zoom/2))+((on/{frames})-0.5)*(iw*0.03)'
-        y = f'(ih/2-(ih/zoom/2))+((on/{frames})-0.5)*(ih*0.03)'
+        z = 'min(pzoom+0.0018,1.18)'
+        x = f'(iw/2-(iw/zoom/2))+((on/{frames})-0.5)*(iw*0.08)'
+        y = f'(ih/2-(ih/zoom/2))+((on/{frames})-0.5)*(iw*0.08)'
     else:
-        z = 'min(pzoom+0.0006,1.06)'
+        z = 'min(pzoom+0.0019,1.20)'
         x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
 

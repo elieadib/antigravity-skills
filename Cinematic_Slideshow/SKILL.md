@@ -25,12 +25,12 @@ Designed to run seamlessly across all PCs (automatically selecting NVIDIA NVENC,
 - **Dynamic 2.5D Ken Burns Effects**:
   - Continuous camera motion on every still photograph: slow push-ins, pull-outs, vista pans, corner-to-subject drifts, and wide landscape reveals.
   - Alternates zoom/pan vectors between consecutive shots to maintain dynamic visual rhythm.
-- **Visible 14px White Borders**:
-  - Automatically applies a crisp 14px white border to all photographs and video files.
-  - Insets horizontal media slightly so the border is never cut off by display edges or TV overscan.
-- **Dual-Layer Compositing for Vertical Media**:
-  - Automatically detects vertical photos and portrait smartphone videos.
-  - Composites the centered, bordered vertical media over a synchronized, Gaussian-blurred (&sigma;=35), dimmed background layer of the same media, filling the 16:9 canvas.
+- **Visible 30px White Borders**:
+  - Automatically applies a crisp 30px white border to all photographs and video files.
+  - Insets media with an 80px margin leaving a blurred matching backdrop so the border is never cut off by display edges or TV overscan.
+- **Dual-Layer Compositing for Portrait & Landscape Media**:
+  - Automatically detects media dimensions (portrait, landscape, square).
+  - Composites the centered, bordered media over a synchronized, Gaussian-blurred (&sigma;=35), dimmed background layer of the same media leaving an 80px blurred background margin, filling the 16:9 canvas.
 - **Customizable Cinematic Title Sequence**:
   - Opens with a 2.0-second pure black screen.
   - Smoothly dissolves into the title slide using `Cover.jpg` (or first photo) with slow push-in.
