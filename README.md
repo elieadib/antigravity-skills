@@ -4,7 +4,7 @@ This repository holds your global skills for **Google Antigravity**, synchronize
 
 ## Included Skills
 
-1. **Cinematic_Slideshow**: Transforms vacation photos and videos into high-end, cinematic 4K UHD slideshow movies with dynamic 2.5D Ken Burns effects, 14px white borders, dual-layer blurred matching backdrops for vertical media, custom title sequences, smooth transitions, and multi-platform hardware acceleration (Apple Silicon VideoToolbox, NVIDIA NVENC, Intel QSV, AMD AMF, CPU).
+1. **Cinematic_Slideshow**: Transforms vacation photos and videos into high-end, cinematic 4K UHD slideshow movies with dynamic 2.5D Ken Burns effects, 30px white borders, dual-layer blurred matching backdrops leaving an 80px margin, custom title sequences, smooth transitions, and multi-platform hardware acceleration (Apple Silicon VideoToolbox, NVIDIA NVENC, Intel QSV, AMD AMF, CPU).
 2. **CleanResidue**: Recursively scans music directories, cleans non-audio residue files (artwork, logs, cue sheets, videos, text), preserves designated audio formats (`mp3`, `m4a`, `flac`), and prunes empty directories.
 3. **FLACMove_Convert**: Synchronizes FLAC album folders to a NAS or backup destination using multi-threaded Robocopy, converts MP3 files to VBR 128 kbps, converts FLAC files to MP3 VBR 190 kbps with metadata and cover art preservation, and safely deletes original FLAC files after verified conversion.
 4. **Movie_Organizer**: Scans movie directories, standardizes video files and matching subtitles to `Movie Name - Release Year`, moves them to target folders, and safely cleans residual torrent assets.
