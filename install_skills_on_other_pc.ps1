@@ -34,7 +34,7 @@ if (Test-Path $TargetDir) {
 }
 
 # Create Directory Junction
-Write-Host "[3/4] Creating Directory Junction to OneDrive skills..." -ForegroundColor Cyan
+Write-Host "[3/4] Creating Directory Junction to Google Drive skills..." -ForegroundColor Cyan
 cmd /c mklink /J "$TargetDir" "$SourceDir"
 
 if ($LASTEXITCODE -eq 0) {

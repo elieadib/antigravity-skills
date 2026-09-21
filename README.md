@@ -1,10 +1,10 @@
 # Antigravity Global Skills (Cloud Synced)
 
-This repository holds your global skills for **Google Antigravity**, synchronized automatically across all your PCs using **OneDrive**.
+This repository holds your global skills for **Google Antigravity**, synchronized automatically across all your PCs using **Google Drive**.
 
 ## Included Skills
 
-1. **Cinematic_Slideshow**: Transforms vacation photos and videos into high-end, cinematic 4K UHD slideshow movies with dynamic 2.5D Ken Burns effects, 30px white borders, dual-layer blurred matching backdrops leaving an 80px margin, custom title sequences, smooth transitions, and multi-platform hardware acceleration (Apple Silicon VideoToolbox, NVIDIA NVENC, Intel QSV, AMD AMF, CPU).
+1. **Cinematic_Slideshow**: Transforms vacation photos and videos into high-end, cinematic 4K UHD slideshow movies with dynamic 2.5D Ken Burns effects, 30px white borders, dual-layer blurred matching backdrops leaving an 80px blurred background margin, custom title sequences, smooth transitions, and multi-platform hardware acceleration (Apple Silicon VideoToolbox, NVIDIA NVENC, Intel QSV, AMD AMF, CPU).
 2. **CleanResidue**: Recursively scans music directories, cleans non-audio residue files (artwork, logs, cue sheets, videos, text), preserves designated audio formats (`mp3`, `m4a`, `flac`), and prunes empty directories.
 3. **FLACMove_Convert**: Synchronizes FLAC album folders to a NAS or backup destination using multi-threaded Robocopy, converts MP3 files to VBR 128 kbps, converts FLAC files to MP3 VBR 190 kbps with metadata and cover art preservation, and safely deletes original FLAC files after verified conversion.
 4. **Movie_Organizer**: Scans movie directories, standardizes video files and matching subtitles to `Movie Name - Release Year`, moves them to target folders, and safely cleans residual torrent assets.
@@ -18,16 +18,16 @@ This repository holds your global skills for **Google Antigravity**, synchronize
 ## How to Enable on Any PC / Mac (1-Click Setup)
 
 ### On Windows:
-1. Ensure OneDrive is signed in and has finished syncing the `Antigravity` folder.
-2. Navigate to: `OneDrive\Antigravity\skills`
+1. Ensure Google Drive is signed in and has finished syncing the `Antigravity` folder (typically `G:\My Drive\Antigravity\skills`).
+2. Navigate to: `My Drive\Antigravity\skills`
 3. Double-click **`install_skills_on_other_pc.bat`** (or run `install_skills_on_other_pc.ps1` in PowerShell).
 
 ### On Mac:
-1. Ensure OneDrive is signed in and syncing.
+1. Ensure Google Drive is signed in and syncing.
 2. Run in Terminal:
    ```bash
-   bash "$HOME/Library/CloudStorage/OneDrive-Personal/Antigravity/skills/install_skills_on_mac.sh"
+   bash "$HOME/Library/CloudStorage/GoogleDrive-elieadib@gmail.com/My Drive/Antigravity/skills/install_skills_on_mac.sh"
    ```
 
 ### Automatic Two-Way Sync
-Any changes, enhancements, or new skills created on **any** of your computers are immediately saved directly to this OneDrive folder and will automatically sync across all your machines!
+Any changes, enhancements, or new skills created on **any** of your computers are immediately saved directly to this Google Drive folder and will automatically sync across all your machines!

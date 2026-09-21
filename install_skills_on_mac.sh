@@ -9,7 +9,7 @@ echo "==========================================================================
 echo "       Google Antigravity - Global Skills Sync Setup for Mac"
 echo "=============================================================================="
 echo ""
-echo "[1/4] Skills Source (OneDrive): $SOURCE_DIR"
+echo "[1/4] Skills Source (Google Drive): $SOURCE_DIR"
 echo "      Antigravity Target:       $TARGET_DIR"
 echo ""
 
@@ -24,7 +24,7 @@ elif [ -d "$TARGET_DIR" ]; then
     mv "$TARGET_DIR" "$BACKUP_DIR"
 fi
 
-echo "[3/4] Creating symlink to OneDrive skills..."
+echo "[3/4] Creating symlink to Google Drive skills..."
 ln -s "$SOURCE_DIR" "$TARGET_DIR"
 
 cat << JSON_EOF > "$CONFIG_DIR/skills.json"

@@ -41,7 +41,7 @@ if exist "!TARGET_DIR!" (
 )
 
 :: 4. Create Directory Junction
-echo [3/4] Linking global skills from OneDrive to Antigravity...
+echo [3/4] Linking global skills from Google Drive to Antigravity...
 mklink /J "!TARGET_DIR!" "!SOURCE_DIR!"
 if !errorlevel! neq 0 (
     echo [ERROR] Failed to create directory junction.
