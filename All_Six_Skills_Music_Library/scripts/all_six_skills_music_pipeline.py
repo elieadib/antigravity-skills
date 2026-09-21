@@ -35,7 +35,7 @@ if sys.platform == "win32":
         pass
 
 DEFAULT_SOURCE_PATH = r"G:\mp3-RawG"
-DEFAULT_NAS_DEST = r"V:\NetGear-NAS-3-HDD1\My_FLAC_Collections\My_FLAC_Collections"
+DEFAULT_NAS_DEST = r"V:\My_FLAC_Collections"
 
 
 def get_skills_root():

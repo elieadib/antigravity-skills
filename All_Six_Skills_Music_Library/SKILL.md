@@ -67,7 +67,7 @@ flowchart LR
 ## Default Paths
 
 - **Source Intake:** `G:\mp3-RawG`
-- **NAS FLAC Archive:** `V:\NetGear-NAS-3-HDD1\My_FLAC_Collections\My_FLAC_Collections`
+- **NAS FLAC Archive:** `V:\My_FLAC_Collections`
 
 *(Both paths can be customized via command-line arguments).*
 
@@ -84,7 +84,7 @@ python "$HOME/.gemini/config/skills/All_Six_Skills_Music_Library/scripts/all_six
 ```
 
 ### 2. Full Live Execution (Default Source & NAS Destination)
-Processes `G:\mp3-RawG` and archives FLACs to `V:\NetGear-NAS-3-HDD1\My_FLAC_Collections\My_FLAC_Collections`:
+Processes `G:\mp3-RawG` and archives FLACs to `V:\My_FLAC_Collections`:
 ```powershell
 python "$HOME/.gemini/config/skills/All_Six_Skills_Music_Library/scripts/all_six_skills_music_pipeline.py"
 ```
