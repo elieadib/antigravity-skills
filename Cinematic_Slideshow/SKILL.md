@@ -28,9 +28,9 @@ Designed to run seamlessly across all PCs (automatically selecting NVIDIA NVENC,
 - **Visible 30px White Borders**:
   - Automatically applies a crisp 30px white border to all photographs and video files.
   - Insets media with an 80px margin leaving a blurred matching backdrop so the border is never cut off by display edges or TV overscan.
-- **Dual-Layer Compositing for Portrait & Landscape Media**:
-  - Automatically detects media dimensions (portrait, landscape, square).
-  - Composites the centered, bordered media over a synchronized, Gaussian-blurred (&sigma;=35), dimmed background layer of the same media leaving an 80px blurred background margin, filling the 16:9 canvas.
+- **Dual-Layer Compositing for Portrait Photos & Vertical/Pillarboxed Videos**:
+  - Automatically detects media dimensions and orientation (portrait, landscape, square, smartphone rotation metadata tags, and pillarboxed vertical videos recorded inside 16:9 containers).
+  - Automatically crops hardcoded black pillarbox bars and composites the centered, bordered photo or video over a synchronized, Gaussian-blurred (&sigma;=35), dimmed background layer of the same media leaving an 80px blurred background margin, completely eliminating black pillarbox bars on widescreen displays.
 - **Customizable Cinematic Title Sequence**:
   - Opens with a 2.0-second pure black screen.
   - Smoothly dissolves into the title slide using `Cover.jpg` (or first photo) with slow push-in.

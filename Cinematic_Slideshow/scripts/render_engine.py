@@ -39,11 +39,17 @@ def run_cmd(cmd, desc=""):
     return res
 
 def get_video_info(path):
-    """Probes video dimensions, duration, and audio stream."""
-    cmd = ["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,width,height,duration", "-of", "json", path]
+    """Probes video dimensions, duration, rotation, and audio stream,
+    detecting whether it is vertical (natively or pillarboxed)."""
+    cmd = [
+        "ffprobe", "-v", "error",
+        "-show_entries", "stream=codec_type,width,height,duration,tags,side_data_list",
+        "-of", "json", path
+    ]
     w, h = 3840, 2160
     has_audio = False
     dur = 5.0
+    rot = 0
     try:
         res = subprocess.run(cmd, capture_output=True, text=True)
         data = json.loads(res.stdout)
@@ -53,11 +59,55 @@ def get_video_info(path):
                 w = int(st.get("width", 3840))
                 h = int(st.get("height", 2160))
                 dur = float(st.get("duration", dur))
+                tags = st.get("tags", {})
+                if "rotate" in tags:
+                    try:
+                        rot = int(tags["rotate"])
+                    except Exception:
+                        pass
+                for sd in st.get("side_data_list", []):
+                    if "rotation" in sd:
+                        try:
+                            rot = int(sd["rotation"])
+                        except Exception:
+                            pass
             elif st.get("codec_type") == "audio":
                 has_audio = True
     except Exception:
         pass
-    return {"width": w, "height": h, "is_portrait": h > w, "has_audio": has_audio, "duration": dur}
+
+    if rot in [90, 270, -90]:
+        w, h = h, w
+
+    crop_filter = None
+    is_vertical = h > w
+
+    # If container is horizontal (w > h), check if it has hardcoded black pillarbox bars
+    if not is_vertical and w > h:
+        check_time = min(1.0, dur / 2.0)
+        cmd_crop = [
+            "ffmpeg", "-ss", f"{check_time:.2f}",
+            "-i", path, "-vframes", "10",
+            "-vf", "cropdetect=24:16:0", "-f", "null", "-"
+        ]
+        try:
+            res_crop = subprocess.run(cmd_crop, capture_output=True, text=True)
+            lines = [l for l in res_crop.stderr.split("\n") if "crop=" in l]
+            if lines:
+                last = lines[-1]
+                idx = last.find("crop=")
+                crop_val = last[idx + 5:].split()[0]
+                cw, ch, cx, cy = [int(x) for x in crop_val.split(":")]
+                if ch > cw * 1.05 and cw < w * 0.85:
+                    is_vertical = True
+                    crop_filter = f"crop={cw}:{ch}:{cx}:{cy}"
+        except Exception:
+            pass
+
+    return {
+        "width": w, "height": h, "is_vertical": is_vertical,
+        "crop_filter": crop_filter, "has_audio": has_audio, "duration": dur
+    }
 
 def is_valid_clip(filepath):
     """Checks if clip file exists and is non-empty."""
@@ -192,8 +242,10 @@ def render_video_clip(shot, out_clip, width, height, fps, encoder, enc_args, bor
     fg_w = max(100, max_box_w - (border_px * 2))
     fg_h = max(100, max_box_h - (border_px * 2))
 
+    pre_crop = f"{info['crop_filter']}," if info.get("crop_filter") else ""
+
     filter_str = (
-        f"[0:v]split=2[fg][bg];"
+        f"[0:v]{pre_crop}split=2[fg][bg];"
         f"[bg]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},boxblur=35:3,eq=brightness=-0.35[blurred];"
         f"[fg]scale={fg_w}:{fg_h}:force_original_aspect_ratio=decrease,pad=iw+{border_px*2}:ih+{border_px*2}:{border_px}:{border_px}:color=white[bordered];"
         f"[blurred][bordered]overlay=(W-w)/2:(H-h)/2,fps={fps}[v]"
