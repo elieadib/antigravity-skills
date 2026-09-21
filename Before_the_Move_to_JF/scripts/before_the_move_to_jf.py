@@ -1,10 +1,10 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
-movie_organizer.py - Movie Organization & Renaming Agent Script
+before_the_move_to_jf.py - Before the Move to JF (Jellyfin) Organization Agent Script
 
 Standardizes movie video files and matching subtitles (.srt) inside subfolders to
 "Movie Name - Release Year", moves them to the parent or target folder, and safely
-deletes the emptied source folders and residual torrent assets.
+deletes the emptied source folders and residual torrent assets before transfer to Jellyfin.
 """
 
 import os
@@ -328,7 +328,7 @@ def print_summary(stats: Dict, dry_run: bool) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Movie Organizer Agent - Clean movie titles, subtitles, and folders."
+        description="Before the Move to JF - Clean movie titles, subtitles, and folders for Jellyfin."
     )
     parser.add_argument(
         "directory",

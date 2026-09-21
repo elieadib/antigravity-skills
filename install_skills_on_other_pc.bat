@@ -81,9 +81,9 @@ echo [SUCCESS] Global Skills are now active on this PC!
 echo.
 echo Available Skills:
 echo   - Cinematic_Slideshow     (4K UHD slideshows with 2.5D Ken Burns, 30px borders)
+echo   - Before_the_Move_to_JF   (Standardize movie video and srt names for Jellyfin, prune torrents)
 echo   - CleanResidue            (Purge non-audio residue, keep MP3/M4A/FLAC)
 echo   - FLACMove_Convert        (Sync FLAC to NAS, transcode to MP3 128k/190k VBR)
-echo   - Movie_Organizer         (Standardize movie video and srt names, prune torrents)
 echo   - Music_Curator           (Download/embed album covers, auto-classify genres)
 echo   - music-cue-flac-splitter (Losslessly split unsplit FLAC/APE/WAV from CUE)
 echo   - music-folder-renamer    (Standardize album folder names)
