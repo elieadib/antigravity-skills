@@ -84,9 +84,10 @@ def scan_directory(source_dir, ignore_prefixes=None):
 
 def build_timeline(source_dir, title_center="Vacation 2026", title_date="",
                    title_duration=9.0, photo_hold_min=3.6, photo_hold_max=4.8,
-                   untrimmed_videos=True, video_max_dur=6.0, seed=2026):
+                   untrimmed_videos=True, video_max_dur=6.0, seed=None, shuffle=True):
     """
     Builds the shot-by-shot timeline structured for narrative flow.
+    If shuffle=True, photos and videos are picked randomly across the entire album.
     """
     cover_file, photos, videos = scan_directory(source_dir)
 
@@ -139,60 +140,77 @@ def build_timeline(source_dir, title_center="Vacation 2026", title_date="",
         "fadeblack"
     ]
 
-    # Group into chronological dates
-    all_dates = sorted(list(set([p["date"] for p in photos] + [v["date"] for v in videos])))
-    rng = random.Random(seed)
-
+    rng = random.Random(seed) if seed is not None else random.Random()
     shot_counter = 2
     motion_idx = 0
     trans_idx = 0
 
-    if not all_dates:
-        all_dates = ["default"]
-
-    for d in all_dates:
-        day_photos = [p for p in photos if p["date"] == d] if d != "default" else list(photos)
-        day_videos = [v for v in videos if v["date"] == d] if d != "default" else list(videos)
-
-        rng.shuffle(day_photos)
-        rng.shuffle(day_videos)
+    if shuffle:
+        # Pick photos and videos completely randomly across the entire folder
+        shuffled_photos = list(photos)
+        shuffled_videos = list(videos)
+        rng.shuffle(shuffled_photos)
+        rng.shuffle(shuffled_videos)
 
         combined = []
         p_idx, v_idx = 0, 0
-        while p_idx < len(day_photos) or v_idx < len(day_videos):
-            for _ in range(rng.randint(1, 2)):
-                if p_idx < len(day_photos):
-                    combined.append(day_photos[p_idx])
+        while p_idx < len(shuffled_photos) or v_idx < len(shuffled_videos):
+            take_photos = rng.randint(2, 4) if shuffled_videos else len(shuffled_photos)
+            for _ in range(take_photos):
+                if p_idx < len(shuffled_photos):
+                    combined.append(shuffled_photos[p_idx])
                     p_idx += 1
-            if v_idx < len(day_videos):
-                combined.append(day_videos[v_idx])
+            if v_idx < len(shuffled_videos):
+                combined.append(shuffled_videos[v_idx])
                 v_idx += 1
+    else:
+        # Group chronologically by date
+        all_dates = sorted(list(set([p["date"] for p in photos] + [v["date"] for v in videos])))
+        if not all_dates:
+            all_dates = ["default"]
 
-        for item in combined:
-            is_photo = item["type"] == "photo"
-            if is_photo:
-                hold_dur = rng.uniform(photo_hold_min, photo_hold_max)
-            else:
-                hold_dur = item["duration"] if untrimmed_videos else min(item["duration"], video_max_dur)
+        combined = []
+        for d in all_dates:
+            day_photos = [p for p in photos if p["date"] == d] if d != "default" else list(photos)
+            day_videos = [v for v in videos if v["date"] == d] if d != "default" else list(videos)
+            rng.shuffle(day_photos)
+            rng.shuffle(day_videos)
 
-            motion = motion_styles[motion_idx % len(motion_styles)]
-            motion_idx += 1
+            p_idx, v_idx = 0, 0
+            while p_idx < len(day_photos) or v_idx < len(day_videos):
+                for _ in range(rng.randint(1, 2)):
+                    if p_idx < len(day_photos):
+                        combined.append(day_photos[p_idx])
+                        p_idx += 1
+                if v_idx < len(day_videos):
+                    combined.append(day_videos[v_idx])
+                    v_idx += 1
 
-            trans = transitions[trans_idx % len(transitions)]
-            trans_idx += 1
+    for item in combined:
+        is_photo = item["type"] == "photo"
+        if is_photo:
+            hold_dur = rng.uniform(photo_hold_min, photo_hold_max)
+        else:
+            hold_dur = item["duration"] if untrimmed_videos else min(item["duration"], video_max_dur)
 
-            timeline.append({
-                "shot_id": shot_counter,
-                "type": item["type"],
-                "filename": item["filename"],
-                "path": item["path"],
-                "orientation": item.get("orientation", "landscape"),
-                "duration": round(hold_dur, 2),
-                "motion": motion if is_photo else "native_video",
-                "transition": trans,
-                "transition_duration": 0.8
-            })
-            shot_counter += 1
+        motion = motion_styles[motion_idx % len(motion_styles)]
+        motion_idx += 1
+
+        trans = transitions[trans_idx % len(transitions)]
+        trans_idx += 1
+
+        timeline.append({
+            "shot_id": shot_counter,
+            "type": item["type"],
+            "filename": item["filename"],
+            "path": item["path"],
+            "orientation": item.get("orientation", "landscape"),
+            "duration": round(hold_dur, 2),
+            "motion": motion if is_photo else "native_video",
+            "transition": trans,
+            "transition_duration": 0.8
+        })
+        shot_counter += 1
 
     # Final Dim to Black Outro (2.5s)
     if len(timeline) > 2:

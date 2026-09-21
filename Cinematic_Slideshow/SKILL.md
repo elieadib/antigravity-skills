@@ -116,6 +116,9 @@ python "$HOME/.gemini/config/skills/Cinematic_Slideshow/scripts/slideshow_maker.
 | `--letterbox` | Flag | Off (16:9 full) | Enables 2.39:1 anamorphic letterbox matte bars |
 | `--border` | Int | `30` | White border thickness in pixels |
 | `--margin` | Int | `80` | Margin around media box leaving blurred background in pixels |
+| `--shuffle` | Flag | On (True) | Randomly shuffle photos and videos across the timeline |
+| `--no-shuffle` | Flag | Off | Arrange photos and videos chronologically by date |
+| `--seed` | Int | `None` | Optional random seed for reproducible shuffle sequences |
 | `--trim-videos` | Float | `None` (untrimmed) | Trims videos to maximum N seconds if set |
 | `--pilot` | Flag | Off | Renders a fast 5-shot test preview |
 | `--clear-cache` | Flag | Off | Clears intermediate render caches before rendering |

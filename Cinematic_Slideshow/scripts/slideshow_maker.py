@@ -8,6 +8,7 @@ import sys
 import argparse
 import timeline_builder
 import render_engine
+import random
 
 def derive_default_title(folder_path):
     """Infers an elegant title from folder name if none is provided."""
@@ -29,6 +30,9 @@ def main():
     parser.add_argument("--letterbox", action="store_true", help="Apply 2.39:1 anamorphic letterbox matte bars")
     parser.add_argument("--border", type=int, default=30, help="White border thickness in pixels (default: 30)")
     parser.add_argument("--margin", type=int, default=80, help="Margin around media box leaving blurred background (default: 80)")
+    parser.add_argument("--shuffle", action="store_true", default=True, help="Randomly shuffle photos and videos throughout the slideshow (default: True)")
+    parser.add_argument("--no-shuffle", dest="shuffle", action="store_false", help="Sort photos and videos chronologically by date")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducible shuffling (default: None for fresh random selection)")
     parser.add_argument("--trim-videos", type=float, default=None, help="Trim videos to max N seconds (default: untrimmed)")
     parser.add_argument("--pilot", action="store_true", help="Render a fast 5-shot preview pilot movie")
     parser.add_argument("--pilot-shots", type=int, default=5, help="Number of content shots in pilot (default: 5)")
@@ -84,35 +88,53 @@ def main():
         title_date=title_date,
         title_duration=args.title_dur,
         untrimmed_videos=untrimmed,
-        video_max_dur=args.trim_videos or 6.0
+        video_max_dur=args.trim_videos or 6.0,
+        seed=args.seed,
+        shuffle=args.shuffle
     )
 
     if args.pilot:
-        print(f"Creating Pilot Preview playlist ({args.pilot_shots} shots, offset={args.pilot_offset})...")
+        print(f"Creating Pilot Preview playlist ({args.pilot_shots} shots, shuffle={args.shuffle})...")
         pilot_shots = [timeline[0], timeline[1]]
         content_shots = [s for s in timeline[2:-1] if s.get("type") in ["photo", "video"]]
         portraits = [s for s in content_shots if s.get("type") == "photo" and s.get("orientation") == "portrait"]
         videos = [s for s in content_shots if s.get("type") == "video"]
         landscapes = [s for s in content_shots if s.get("type") == "photo" and s.get("orientation") == "landscape"]
 
-        # 1. Prioritize 1 portrait photo (using offset)
-        if portraits:
-            p_idx = args.pilot_offset % len(portraits)
-            pilot_shots.append(portraits[p_idx])
+        rng = random.Random(args.seed) if args.seed is not None else random.Random()
 
-        # 2. Prioritize 1 video (if present)
-        if videos:
-            v_idx = args.pilot_offset % len(videos)
-            pilot_shots.append(videos[v_idx])
+        if args.shuffle:
+            # 1. Pick 1 random portrait if available
+            if portraits:
+                pilot_shots.append(rng.choice(portraits))
 
-        # 3. Fill remaining slots with landscapes starting from offset * 3
-        l_start = (args.pilot_offset * 3) % len(landscapes) if landscapes else 0
-        l_candidates = landscapes[l_start:] + landscapes[:l_start]
-        for s in l_candidates:
-            if len(pilot_shots) >= args.pilot_shots + 1:
-                break
-            if s not in pilot_shots:
-                pilot_shots.append(s)
+            # 2. Pick 1 random video if available
+            if videos:
+                pilot_shots.append(rng.choice(videos))
+
+            # 3. Fill remaining slots with random landscapes without repetition
+            remaining_count = max(0, (args.pilot_shots + 2) - len(pilot_shots))
+            avail_landscapes = [s for s in landscapes if s not in pilot_shots]
+            if avail_landscapes:
+                take_count = min(remaining_count, len(avail_landscapes))
+                pilot_shots.extend(rng.sample(avail_landscapes, take_count))
+        else:
+            # Deterministic offset-based picking
+            if portraits:
+                p_idx = args.pilot_offset % len(portraits)
+                pilot_shots.append(portraits[p_idx])
+
+            if videos:
+                v_idx = args.pilot_offset % len(videos)
+                pilot_shots.append(videos[v_idx])
+
+            l_start = (args.pilot_offset * 3) % len(landscapes) if landscapes else 0
+            l_candidates = landscapes[l_start:] + landscapes[:l_start]
+            for s in l_candidates:
+                if len(pilot_shots) >= args.pilot_shots + 2:
+                    break
+                if s not in pilot_shots:
+                    pilot_shots.append(s)
 
         if len(pilot_shots) > 2:
             pilot_shots[-1]["transition"] = "fadeblack"
