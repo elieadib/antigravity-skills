@@ -23,7 +23,7 @@ def probe_video_duration(path):
 def scan_directory(source_dir, ignore_prefixes=None):
     """Catalogues photos and videos in source_dir, filtering out generated exports."""
     if ignore_prefixes is None:
-        ignore_prefixes = ["summer", "pilot", "slideshow", "temp_"]
+        ignore_prefixes = ["summer", "pilot", "slideshow", "temp_", "photos of our"]
 
     files = sorted(os.listdir(source_dir))
     photos = []
@@ -39,6 +39,11 @@ def scan_directory(source_dir, ignore_prefixes=None):
 
         if any(low.startswith(p) for p in ignore_prefixes) or "_pilot" in low or "slideshow" in low:
             continue
+
+        # Filter out existing rendered slideshow movies
+        if ext in [".mp4", ".mov", ".mkv"]:
+            if any(k in low for k in ["mariage", "engagement", "pilot", "slideshow", "vacation"]):
+                continue
 
         full_path = os.path.join(source_dir, f)
 
@@ -124,10 +129,11 @@ def build_timeline(source_dir, title_center="Vacation 2026", title_date="",
     motion_styles = [
         "zoom_in_center",
         "zoom_out_center",
-        "pan_left_to_right",
-        "push_in_diagonal",
-        "zoom_in_center",
-        "pan_right_to_left",
+        "zoom_in_upper",
+        "zoom_out_upper",
+        "zoom_in_diagonal_left",
+        "zoom_out_diagonal_right",
+        "zoom_in_wide",
         "zoom_out_wide"
     ]
 

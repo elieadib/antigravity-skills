@@ -5,6 +5,7 @@ dual-layer blurred matching backdrops for vertical and horizontal media,
 prominent 30px white borders, and optional letterbox matting.
 """
 import os
+import subprocess
 from PIL import Image, ImageOps, ImageFilter, ImageDraw, ImageFont
 
 def get_font(font_name="georgiab.ttf", size=100):
@@ -42,10 +43,10 @@ def prepare_title_layers(cover_path, bg_output_path, fg_output_path,
                          title_bottom_right="", border_px=30, blur_radius=35,
                          letterbox_bars=0, margin=80):
     """
-    Prepares title slide layers adhering to the white box rule:
+    Prepares title slide layers:
     1. bg_output_path: Blurred, dimmed 4K matching background.
-    2. fg_output_path: Resized cover photo with atmospheric dimming and elegant typography.
-    Returns: (target_w, target_h)
+    2. fg_output_path: Resized clean cover photo with atmospheric tone (no baked text).
+    Returns: (target_w, target_h, layout_info)
     """
     img = Image.open(cover_path).convert("RGB")
     img = ImageOps.exif_transpose(img)
@@ -90,7 +91,8 @@ def prepare_title_layers(cover_path, bg_output_path, fg_output_path,
     fg_rgba = fg_resized.convert("RGBA")
     fg_rgba.paste(overlay, (0, 0), overlay)
 
-    draw = ImageDraw.Draw(fg_rgba, "RGBA")
+    # Save clean foreground photo (without baked text)
+    fg_rgba.convert("RGB").save(fg_output_path, quality=95)
 
     # Typography sizing proportional to photo height
     center_font_size = int(target_h * 0.055)
@@ -99,26 +101,128 @@ def prepare_title_layers(cover_path, bg_output_path, fg_output_path,
     font_center = get_font("georgiab.ttf", center_font_size)
     font_date = get_font("georgia.ttf", date_font_size)
 
-    bbox_c = font_center.getbbox(title_center)
+    bbox_c = font_center.getbbox(title_center) if title_center else (0, 0, 0, 0)
     tw_c, th_c = bbox_c[2] - bbox_c[0], bbox_c[3] - bbox_c[1]
-    cx = target_w // 2
-    cy = target_h // 2
+    cx = width // 2
+    cy = height // 2
+    x_c = cx - tw_c // 2
+    y_c = cy - th_c // 2
 
-    # Drop shadow & title text
-    draw.text((cx - tw_c // 2 + 4, cy - th_c // 2 + 4), title_center, font=font_center, fill=(0, 0, 0, 230))
-    draw.text((cx - tw_c // 2, cy - th_c // 2), title_center, font=font_center, fill=(255, 255, 255, 255))
-
+    photo_x2 = (width + target_w) // 2
+    photo_y2 = (height + target_h) // 2
     if title_bottom_right:
         bbox_d = font_date.getbbox(title_bottom_right)
         tw_d, th_d = bbox_d[2] - bbox_d[0], bbox_d[3] - bbox_d[1]
-        rx = target_w - tw_d - int(target_w * 0.04)
-        ry = target_h - th_d - int(target_h * 0.05)
+        rx = photo_x2 - tw_d - int(target_w * 0.04)
+        ry = photo_y2 - th_d - int(target_h * 0.05)
+    else:
+        rx, ry, tw_d, th_d = 0, 0, 0, 0
 
-        draw.text((rx + 3, ry + 3), title_bottom_right, font=font_date, fill=(0, 0, 0, 220))
-        draw.text((rx, ry), title_bottom_right, font=font_date, fill=(245, 235, 210, 255))
+    layout_info = {
+        "target_w": target_w,
+        "target_h": target_h,
+        "center_font_size": center_font_size,
+        "date_font_size": date_font_size,
+        "x_c": x_c,
+        "y_c": y_c,
+        "rx": rx,
+        "ry": ry,
+        "title_center": title_center,
+        "title_date": title_bottom_right
+    }
 
-    fg_rgba.convert("RGB").save(fg_output_path, quality=95)
-    return target_w, target_h
+    return target_w, target_h, layout_info
+
+def generate_typewriter_overlay(output_path, layout_info, dur=9.0, fps=24, width=3840, height=2160):
+    """
+    Generates an RGBA transparent QuickTime video (.mov) with character-by-character
+    typewriter animation for the title slide:
+    - t = 0.0s to 2.0s: Pure transparent (clean photo displayed).
+    - t = 2.0s: 1st text (centered) begins typing character-by-character.
+    - t = 4.0s: 2nd text (bottom-right date) begins typing character-by-character (2s after 1st text).
+    - t > typing: Both texts held with elegant drop shadow until transition.
+    """
+    title_center = layout_info.get("title_center", "")
+    title_date = layout_info.get("title_date", "")
+    center_font_size = layout_info.get("center_font_size", 100)
+    date_font_size = layout_info.get("date_font_size", 60)
+    x_c = layout_info.get("x_c", width // 2)
+    y_c = layout_info.get("y_c", height // 2)
+    rx = layout_info.get("rx", width - 300)
+    ry = layout_info.get("ry", height - 200)
+
+    font_center = get_font("georgiab.ttf", center_font_size)
+    font_date = get_font("georgia.ttf", date_font_size)
+
+    total_frames = int(dur * fps)
+    f_start1 = int(2.0 * fps)
+    f_start2 = int(4.0 * fps)
+
+    # Center text typing duration: ~1.8s (or max 2.0s)
+    len1 = len(title_center)
+    f_dur1 = int(min(2.0, max(0.8, len1 * 0.05)) * fps) if len1 > 0 else 1
+
+    # Date text typing duration: ~0.7s
+    len2 = len(title_date)
+    f_dur2 = int(min(1.2, max(0.4, len2 * 0.08)) * fps) if len2 > 0 else 1
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{width}x{height}", "-r", str(fps),
+        "-i", "-",
+        "-c:v", "qtrle",
+        output_path
+    ]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+    empty_bytes = Image.new("RGBA", (width, height), (0, 0, 0, 0)).tobytes()
+    cached_bytes = {}
+
+    for f in range(total_frames):
+        t = f / fps
+        if t < 2.0 or (not title_center and not title_date):
+            proc.stdin.write(empty_bytes)
+            continue
+
+        # Substring for title 1
+        if not title_center:
+            sub1 = ""
+        elif f < f_start1 + f_dur1:
+            progress1 = (f - f_start1) / f_dur1
+            c1_len = max(1, min(len1, int(round(progress1 * len1))))
+            sub1 = title_center[:c1_len]
+        else:
+            sub1 = title_center
+
+        # Substring for title 2 (starts at t = 4.0s)
+        if not title_date or f < f_start2:
+            sub2 = ""
+        elif f < f_start2 + f_dur2:
+            progress2 = (f - f_start2) / f_dur2
+            c2_len = max(1, min(len2, int(round(progress2 * len2))))
+            sub2 = title_date[:c2_len]
+        else:
+            sub2 = title_date
+
+        state_key = (sub1, sub2)
+        if state_key in cached_bytes:
+            proc.stdin.write(cached_bytes[state_key])
+        else:
+            img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            if sub1:
+                draw.text((x_c + 4, y_c + 4), sub1, font=font_center, fill=(0, 0, 0, 230))
+                draw.text((x_c, y_c), sub1, font=font_center, fill=(255, 255, 255, 255))
+            if sub2:
+                draw.text((rx + 3, ry + 3), sub2, font=font_date, fill=(0, 0, 0, 220))
+                draw.text((rx, ry), sub2, font=font_date, fill=(245, 235, 210, 255))
+            raw = img.tobytes()
+            cached_bytes[state_key] = raw
+            proc.stdin.write(raw)
+
+    proc.stdin.close()
+    proc.wait()
+    return output_path
 
 def create_title_slide(cover_path, output_path, width=3840, height=2160,
                        title_center="Vacation 2026", title_bottom_right="",
@@ -129,7 +233,7 @@ def create_title_slide(cover_path, output_path, width=3840, height=2160,
     """
     bg_tmp = output_path + ".bg.jpg"
     fg_tmp = output_path + ".fg.jpg"
-    target_w, target_h = prepare_title_layers(
+    target_w, target_h, layout_info = prepare_title_layers(
         cover_path, bg_tmp, fg_tmp, width, height, title_center,
         title_bottom_right, border_px, 35, letterbox_bars, margin
     )
@@ -140,6 +244,18 @@ def create_title_slide(cover_path, output_path, width=3840, height=2160,
     fg_x = (width - bordered.width) // 2
     fg_y = (height - bordered.height) // 2
     canvas.paste(bordered, (fg_x, fg_y))
+
+    # Draw final text on canvas for static slide
+    draw = ImageDraw.Draw(canvas)
+    font_center = get_font("georgiab.ttf", layout_info["center_font_size"])
+    font_date = get_font("georgia.ttf", layout_info["date_font_size"])
+    if title_center:
+        draw.text((layout_info["x_c"] + 4, layout_info["y_c"] + 4), title_center, font=font_center, fill=(0, 0, 0, 230))
+        draw.text((layout_info["x_c"], layout_info["y_c"]), title_center, font=font_center, fill=(255, 255, 255, 255))
+    if title_bottom_right:
+        draw.text((layout_info["rx"] + 3, layout_info["ry"] + 3), title_bottom_right, font=font_date, fill=(0, 0, 0, 220))
+        draw.text((layout_info["rx"], layout_info["ry"]), title_bottom_right, font=font_date, fill=(245, 235, 210, 255))
+
     canvas.save(output_path, quality=95)
     try:
         os.remove(bg_tmp)

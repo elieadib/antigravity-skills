@@ -131,8 +131,9 @@ def render_title_clip(shot, out_clip, cache_dir, width, height, fps, encoder, en
                       title_center, title_date, border_px=30, letterbox_bars=0, margin=80):
     bg_frame = os.path.join(cache_dir, "title_bg.jpg")
     fg_frame = os.path.join(cache_dir, "title_fg.jpg")
+    overlay_mov = os.path.join(cache_dir, "title_typewriter.mov")
 
-    target_w, target_h = compositor.prepare_title_layers(
+    target_w, target_h, layout_info = compositor.prepare_title_layers(
         shot["path"], bg_frame, fg_frame,
         width=width, height=height, title_center=title_center,
         title_bottom_right=title_date, border_px=border_px,
@@ -140,6 +141,11 @@ def render_title_clip(shot, out_clip, cache_dir, width, height, fps, encoder, en
     )
 
     dur = shot["duration"]
+    print("  -> Generating typewriter title overlay...")
+    compositor.generate_typewriter_overlay(
+        overlay_mov, layout_info, dur=dur, fps=fps, width=width, height=height
+    )
+
     frames = int(dur * fps)
     pad_w = target_w + (border_px * 2)
     pad_h = target_h + (border_px * 2)
@@ -147,17 +153,19 @@ def render_title_clip(shot, out_clip, cache_dir, width, height, fps, encoder, en
     vf = (
         f"[1:v]zoompan=z='min(pzoom+0.0003,1.04)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={target_w}x{target_h}:fps={fps},"
         f"pad={pad_w}:{pad_h}:{border_px}:{border_px}:color=white[bordered];"
-        f"[0:v][bordered]overlay=(W-w)/2:(H-h)/2,fps={fps}[v]"
+        f"[0:v][bordered]overlay=(W-w)/2:(H-h)/2[base];"
+        f"[base][2:v]overlay=0:0,fps={fps}[v]"
     )
 
     cmd = [
         "ffmpeg", "-y",
         "-loop", "1", "-t", str(dur), "-i", bg_frame,
         "-loop", "1", "-t", str(dur), "-i", fg_frame,
+        "-i", overlay_mov,
         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
         "-filter_complex", vf,
         "-map", "[v]",
-        "-map", "2:a",
+        "-map", "3:a",
         "-t", str(dur),
         "-c:v", encoder, *enc_args,
         "-pix_fmt", "yuv420p",
@@ -183,27 +191,39 @@ def render_photo_clip(shot, out_clip, cache_dir, width, height, fps, encoder, en
     motion = shot.get("motion", "zoom_in_center")
 
     if motion == "zoom_in_center":
-        z = 'min(pzoom+0.0019,1.20)'
+        z = 'min(pzoom+0.0021,1.20)'
         x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
-    elif motion in ["zoom_out_center", "zoom_out_wide"]:
-        z = 'if(lte(pzoom,1.0),1.20,max(1.01,pzoom-0.0019))'
+    elif motion == "zoom_out_center":
+        z = 'if(lte(pzoom,1.0),1.20,max(1.01,pzoom-0.0021))'
         x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
-    elif motion == "pan_left_to_right":
-        z = '1.16'
-        x = f'(iw/2-(iw/zoom/2))+((on/{frames})-0.5)*(iw*0.12)'
+    elif motion == "zoom_in_upper":
+        z = 'min(pzoom+0.0021,1.20)'
+        x = 'iw/2-(iw/zoom/2)'
+        y = '(ih*0.35)*(1-1/zoom)'
+    elif motion == "zoom_out_upper":
+        z = 'if(lte(pzoom,1.0),1.20,max(1.01,pzoom-0.0021))'
+        x = 'iw/2-(iw/zoom/2)'
+        y = '(ih*0.35)*(1-1/zoom)'
+    elif motion == "zoom_in_diagonal_left":
+        z = 'min(pzoom+0.0021,1.20)'
+        x = '(iw*0.40)*(1-1/zoom)'
+        y = '(ih*0.40)*(1-1/zoom)'
+    elif motion == "zoom_out_diagonal_right":
+        z = 'if(lte(pzoom,1.0),1.20,max(1.01,pzoom-0.0021))'
+        x = '(iw*0.60)*(1-1/zoom)'
+        y = '(ih*0.60)*(1-1/zoom)'
+    elif motion == "zoom_in_wide":
+        z = 'min(pzoom+0.0016,1.15)'
+        x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
-    elif motion == "pan_right_to_left":
-        z = '1.16'
-        x = f'(iw/2-(iw/zoom/2))-((on/{frames})-0.5)*(iw*0.12)'
+    elif motion == "zoom_out_wide":
+        z = 'if(lte(pzoom,1.0),1.16,max(1.01,pzoom-0.0016))'
+        x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
-    elif motion == "push_in_diagonal":
-        z = 'min(pzoom+0.0018,1.18)'
-        x = f'(iw/2-(iw/zoom/2))+((on/{frames})-0.5)*(iw*0.08)'
-        y = f'(ih/2-(ih/zoom/2))+((on/{frames})-0.5)*(iw*0.08)'
     else:
-        z = 'min(pzoom+0.0019,1.20)'
+        z = 'min(pzoom+0.0021,1.20)'
         x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
 

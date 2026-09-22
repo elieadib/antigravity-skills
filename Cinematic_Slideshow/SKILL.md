@@ -37,20 +37,24 @@ Before initiating ANY slideshow processing or rendering (whether running a pilot
 
 - **Universal Multi-PC Hardware Acceleration**:
   - Automatically probes available video encoders: **NVIDIA NVENC** (`h264_nvenc`), **Intel QuickSync** (`h264_qsv`), **AMD AMF** (`h264_amf`), or optimized CPU (`libx264`). Runs at maximum speed on any desktop or laptop without manual setup.
-- **Dynamic 2.5D Ken Burns Effects**:
-  - Continuous camera motion on every still photograph: slow push-ins, pull-outs, vista pans, corner-to-subject drifts, and wide landscape reveals.
-  - Alternates zoom/pan vectors between consecutive shots to maintain dynamic visual rhythm.
+- **Dynamic 2.5D Ken Burns Effects (Zoom-In & Zoom-Out Focus)**:
+  - Continuous camera motion on 100% of still photographs, heavily favoring smooth zoom-in and zoom-out motions:
+    `zoom_in_center`, `zoom_out_center`, `zoom_in_upper` (focusing on faces and subjects in upper third), `zoom_out_upper`,
+    `zoom_in_diagonal_left`, `zoom_out_diagonal_right`, `zoom_in_wide`, and `zoom_out_wide`.
+  - Every photograph actively changes scale (`z`) on every frame, with mathematically bounded coordinates guaranteeing zero static clamping or boundary freezing.
 - **Visible 30px White Borders**:
   - Automatically applies a crisp 30px white border to all photographs and video files.
   - Insets media with an 80px margin leaving a blurred matching backdrop so the border is never cut off by display edges or TV overscan.
 - **Dual-Layer Compositing for Portrait Photos & Vertical/Pillarboxed Videos**:
   - Automatically detects media dimensions and orientation (portrait, landscape, square, smartphone rotation metadata tags, and pillarboxed vertical videos recorded inside 16:9 containers).
   - Automatically crops hardcoded black pillarbox bars and composites the centered, bordered photo or video over a synchronized, Gaussian-blurred (&sigma;=35), dimmed background layer of the same media leaving an 80px blurred background margin, completely eliminating black pillarbox bars on widescreen displays.
-- **Customizable Cinematic Title Sequence**:
+- **Timed Typewriter Title Sequence**:
   - Opens with a 2.0-second pure black screen.
   - Smoothly dissolves into the title slide using `Cover.jpg` (or first photo) with slow push-in.
-  - Displays large centered main title with soft drop shadow and bottom-right secondary date/location text.
-  - Configurable duration (default 9.0s).
+  - **t = 0.0s – 2.0s**: Displays the clean cover photo with 30px white border and slow push-in (no text visible).
+  - **t = 2.0s**: Centered Event Text begins typing character-by-character in the center.
+  - **t = 4.0s**: (2.0s after the 1st text starts) Bottom-right date text begins typing character-by-character.
+  - **t > typing**: Both titles held with elegant drop shadow until the transition (default duration 9.0s).
 - **Untrimmed Video Support**:
   - By default preserves 100% of original video recordings without arbitrary cutting. Optional `--trim-videos N` flag available for fast highlight reels.
 - **Audio Crossfades**:
