@@ -609,40 +609,58 @@ def generate_photo_caption_overlay(caption_text, out_png, width=3840, height=216
     Renders a transparent PNG overlay at canvas resolution (width x height)
     with caption_text centered horizontally near the bottom of the photo area,
     inside the photo frame just above the inner border.
+    Maintains a uniform large font size across all photos and videos (portrait & landscape)
+    by intelligently wrapping into balanced multi-line text rather than shrinking font.
     Uses multi-direction drop shadow / outline for strong legibility.
     """
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
+    # Maintain constant, legible font size across both horizontal and vertical media
     font_size = max(54, int(target_h * 0.057))
     font = get_font(font_name, font_size)
 
-    bb = font.getbbox(caption_text)
-    text_w = bb[2] - bb[0]
-    text_h = bb[3] - bb[1]
+    # Determine maximum line width:
+    # On vertical photos/videos, allow text to comfortably span across canvas width
+    # without exceeding screen bounds or shrinking font size.
+    is_vertical = target_h > target_w
+    if is_vertical:
+        max_line_w = min(int(width * 0.62), 2400)
+    else:
+        max_line_w = max(target_w - 80, int(width * 0.65))
 
-    # Constrain text width so it never overflows photo width with safety padding
-    max_text_w = target_w - 80
-    if text_w > max_text_w and text_w > 0:
-        scale_ratio = max_text_w / text_w
-        font_size = max(38, int(font_size * scale_ratio))
-        font = get_font(font_name, font_size)
-        bb = font.getbbox(caption_text)
-        text_w = bb[2] - bb[0]
-        text_h = bb[3] - bb[1]
+    lines = wrap_text_to_lines(caption_text, font, max_line_w)
+    if not lines:
+        lines = [caption_text]
+
+    # Safety: ensure no individual line exceeds screen canvas safe bounds
+    max_screen_w = width - 200
+    for l in lines:
+        bb = font.getbbox(l)
+        lw = bb[2] - bb[0]
+        if lw > max_screen_w and lw > 0:
+            ratio = max_screen_w / lw
+            font_size = max(54, int(font_size * ratio))
+            font = get_font(font_name, font_size)
+            lines = wrap_text_to_lines(caption_text, font, max_line_w)
+            break
 
     bordered_w = target_w + (border_px * 2)
     bordered_h = target_h + (border_px * 2)
     fg_x = (width - bordered_w) // 2
     fg_y = (height - bordered_h) // 2
 
-    # Centered horizontally
-    cx = (width - text_w) // 2
+    # Calculate total height of wrapped lines
+    line_spacing = int(font_size * 0.25)
+    line_bboxes = [font.getbbox(l) for l in lines]
+    line_heights = [b[3] - b[1] for b in line_bboxes]
+    total_text_h = sum(line_heights) + line_spacing * (len(lines) - 1)
+
     # Bottom inner edge of photo is at fg_y + bordered_h - border_px
     bottom_inner_y = fg_y + bordered_h - border_px
-    cy = bottom_inner_y - text_h - int(target_h * 0.035)
+    cy = bottom_inner_y - total_text_h - int(target_h * 0.035)
 
-    # Multi-directional dark outline and shadow
+    # Multi-directional dark outline and shadow for maximum contrast
     shadow_offsets = [
         (-4, -4), (-4, 0), (-4, 4),
         (0, -4),           (0, 4),
@@ -651,11 +669,19 @@ def generate_photo_caption_overlay(caption_text, out_png, width=3840, height=216
         (-2, -2), (2, -2), (-2, 2), (2, 2),
         (5, 5),   (6, 6)
     ]
-    for ox, oy in shadow_offsets:
-        draw.text((cx + ox, cy + oy), caption_text, font=font, fill=(0, 0, 0, 230))
 
-    # Foreground pure white text
-    draw.text((cx, cy), caption_text, font=font, fill=(255, 255, 255, 255))
+    curr_y = cy
+    for l, lh in zip(lines, line_heights):
+        bb = font.getbbox(l)
+        lw = bb[2] - bb[0]
+        cx = (width - lw) // 2
+
+        for ox, oy in shadow_offsets:
+            draw.text((cx + ox, curr_y + oy), l, font=font, fill=(0, 0, 0, 240))
+
+        # Foreground pure white text
+        draw.text((cx, curr_y), l, font=font, fill=(255, 255, 255, 255))
+        curr_y += lh + line_spacing
 
     img.save(out_png, "PNG")
     return out_png

@@ -299,23 +299,61 @@ def render_video_clip(shot, out_clip, width, height, fps, encoder, enc_args, bor
     fg_w = max(100, max_box_w - (border_px * 2))
     fg_h = max(100, max_box_h - (border_px * 2))
 
+    vw = info["width"]
+    vh = info["height"]
+    scale = min(fg_w / vw, fg_h / vh) if vw > 0 and vh > 0 else 1.0
+    target_vw = (int(vw * scale) // 2) * 2
+    target_vh = (int(vh * scale) // 2) * 2
+
+    caption = shot.get("caption")
+    caption_png = None
+    if caption:
+        cache_dir = os.path.dirname(out_clip)
+        shot_id = shot.get("id", 0)
+        caption_png = os.path.join(cache_dir, f"caption_vid_{shot_id:03d}.png")
+        compositor.generate_photo_caption_overlay(
+            caption, caption_png, width=width, height=height,
+            target_w=target_vw, target_h=target_vh, border_px=border_px
+        )
+
     pre_crop = f"{info['crop_filter']}," if info.get("crop_filter") else ""
 
-    filter_str = (
-        f"[0:v]{pre_crop}split=2[fg][bg];"
-        f"[bg]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},boxblur=35:3,eq=brightness=-0.35[blurred];"
-        f"[fg]scale={fg_w}:{fg_h}:force_original_aspect_ratio=decrease,pad=iw+{border_px*2}:ih+{border_px*2}:{border_px}:{border_px}:color=white[bordered];"
-        f"[blurred][bordered]overlay=(W-w)/2:(H-h)/2,fps={fps}[v]"
-    )
+    if caption_png:
+        filter_str = (
+            f"[0:v]{pre_crop}split=2[fg][bg];"
+            f"[bg]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},boxblur=35:3,eq=brightness=-0.35[blurred];"
+            f"[fg]scale={fg_w}:{fg_h}:force_original_aspect_ratio=decrease,pad=iw+{border_px*2}:ih+{border_px*2}:{border_px}:{border_px}:color=white[bordered];"
+            f"[blurred][bordered]overlay=(W-w)/2:(H-h)/2[base];"
+            f"[base][1:v]overlay=0:0,fps={fps}[v]"
+        )
+    else:
+        filter_str = (
+            f"[0:v]{pre_crop}split=2[fg][bg];"
+            f"[bg]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},boxblur=35:3,eq=brightness=-0.35[blurred];"
+            f"[fg]scale={fg_w}:{fg_h}:force_original_aspect_ratio=decrease,pad=iw+{border_px*2}:ih+{border_px*2}:{border_px}:{border_px}:color=white[bordered];"
+            f"[blurred][bordered]overlay=(W-w)/2:(H-h)/2,fps={fps}[v]"
+        )
 
     fade_out_start = max(0, dur - 0.5)
 
     if info["has_audio"]:
         af = f"[0:a]aformat=sample_rates=48000:channel_layouts=stereo,afade=t=in:ss=0:d=0.5,afade=t=out:st={fade_out_start:.2f}:d=0.5[a]"
         inputs = ["-i", path]
+        if caption_png:
+            inputs.extend(["-loop", "1", "-t", str(dur), "-i", caption_png])
         fc = f"{filter_str};{af}"
+        map_a = "[a]"
     else:
-        inputs = ["-i", path, "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
+        inputs = ["-i", path]
+        if caption_png:
+            inputs.extend(["-loop", "1", "-t", str(dur), "-i", caption_png])
+            # filter_str uses [1:v] for caption overlay
+            # null audio will be input 2
+            inputs.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"])
+            map_a = "2:a"
+        else:
+            inputs.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"])
+            map_a = "1:a"
         fc = filter_str
 
     cmd = [
@@ -323,7 +361,7 @@ def render_video_clip(shot, out_clip, width, height, fps, encoder, enc_args, bor
         *inputs,
         "-filter_complex", fc,
         "-map", "[v]",
-        "-map", "[a]" if info["has_audio"] else "1:a",
+        "-map", map_a,
         "-t", str(dur),
         "-c:v", encoder, *enc_args,
         "-pix_fmt", "yuv420p",
