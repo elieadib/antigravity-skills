@@ -132,6 +132,7 @@ def render_title_clip(shot, out_clip, cache_dir, width, height, fps, encoder, en
     bg_frame = os.path.join(cache_dir, "title_bg.jpg")
     fg_frame = os.path.join(cache_dir, "title_fg.jpg")
     overlay_mov = os.path.join(cache_dir, "title_typewriter.mov")
+    audio_wav = os.path.join(cache_dir, "title_audio.wav")
 
     target_w, target_h, layout_info = compositor.prepare_title_layers(
         shot["path"], bg_frame, fg_frame,
@@ -144,6 +145,11 @@ def render_title_clip(shot, out_clip, cache_dir, width, height, fps, encoder, en
     print("  -> Generating typewriter title overlay...")
     compositor.generate_typewriter_overlay(
         overlay_mov, layout_info, dur=dur, fps=fps, width=width, height=height
+    )
+
+    print("  -> Generating typewriter sound effect track...")
+    compositor.generate_typewriter_audio(
+        audio_wav, title_center, title_date, dur=dur, sr=48000
     )
 
     frames = int(dur * fps)
@@ -162,7 +168,7 @@ def render_title_clip(shot, out_clip, cache_dir, width, height, fps, encoder, en
         "-loop", "1", "-t", str(dur), "-i", bg_frame,
         "-loop", "1", "-t", str(dur), "-i", fg_frame,
         "-i", overlay_mov,
-        "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
+        "-i", audio_wav,
         "-filter_complex", vf,
         "-map", "[v]",
         "-map", "3:a",

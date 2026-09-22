@@ -6,6 +6,10 @@ prominent 30px white borders, and optional letterbox matting.
 """
 import os
 import subprocess
+import wave
+import struct
+import random
+import math
 from PIL import Image, ImageOps, ImageFilter, ImageDraw, ImageFont
 
 def get_font(font_name="georgiab.ttf", size=100):
@@ -158,13 +162,13 @@ def generate_typewriter_overlay(output_path, layout_info, dur=9.0, fps=24, width
     f_start1 = int(2.0 * fps)
     f_start2 = int(4.0 * fps)
 
-    # Center text typing duration: ~1.8s (or max 2.0s)
+    # Center text typing duration: exactly 2.0s
     len1 = len(title_center)
-    f_dur1 = int(min(2.0, max(0.8, len1 * 0.05)) * fps) if len1 > 0 else 1
+    f_dur1 = int(2.0 * fps) if len1 > 0 else 1
 
-    # Date text typing duration: ~0.7s
+    # Date text typing duration: exactly 2.0s
     len2 = len(title_date)
-    f_dur2 = int(min(1.2, max(0.4, len2 * 0.08)) * fps) if len2 > 0 else 1
+    f_dur2 = int(2.0 * fps) if len2 > 0 else 1
 
     cmd = [
         "ffmpeg", "-y",
@@ -186,6 +190,8 @@ def generate_typewriter_overlay(output_path, layout_info, dur=9.0, fps=24, width
 
         # Substring for title 1
         if not title_center:
+            sub1 = ""
+        elif f < f_start1:
             sub1 = ""
         elif f < f_start1 + f_dur1:
             progress1 = (f - f_start1) / f_dur1
@@ -223,6 +229,125 @@ def generate_typewriter_overlay(output_path, layout_info, dur=9.0, fps=24, width
     proc.stdin.close()
     proc.wait()
     return output_path
+
+def generate_typewriter_audio(audio_output_path, title_center, title_date, dur=9.0, sr=48000):
+    """
+    Generates an authentic 48kHz stereo WAV soundtrack for the typewriter title slide:
+    - 0.0s - 2.0s: Silence while cover photo push-in begins.
+    - 2.0s - 4.0s: Mechanical key strokes & spacebar sounds typing Centered Event Text (2.0s duration).
+      At 4.02s: Carriage return bell ding!
+    - 4.0s - 6.0s: Mechanical key strokes & spacebar sounds typing Bottom-Right Date Text (2.0s duration).
+      At 6.02s: Carriage return bell ding!
+    - 6.0s - end: Silence with natural bell resonance decay.
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.path.dirname(script_dir), "resources", "audio"),
+        os.path.join(script_dir, "resources", "audio"),
+        r"C:\Users\eliea\.gemini\config\skills\Cinematic_Slideshow\resources\audio",
+        r"D:\GoogleDrive\Antigravity\skills\Cinematic_Slideshow\resources\audio"
+    ]
+    audio_dir = ""
+    for d in candidates:
+        if os.path.exists(d):
+            audio_dir = d
+            break
+
+    def load_wav(name):
+        if not audio_dir:
+            return [], []
+        p = os.path.join(audio_dir, name)
+        if not os.path.exists(p):
+            return [], []
+        try:
+            with wave.open(p, 'rb') as w:
+                n = w.getnframes()
+                ch = w.getnchannels()
+                raw = w.readframes(n)
+                s = struct.unpack(f'<{n * ch}h', raw)
+                if ch == 2:
+                    return [x / 32768.0 for x in s[0::2]], [x / 32768.0 for x in s[1::2]]
+                else:
+                    l = [x / 32768.0 for x in s]
+                    return l, list(l)
+        except Exception as e:
+            print(f"Warning: Could not load {name}: {e}")
+            return [], []
+
+    key_l, key_r = load_wav('typewriter_key.wav')
+    spc_l, spc_r = load_wav('typewriter_space.wav')
+    bel_l, bel_r = load_wav('typewriter_bell.wav')
+
+    total_samples = int(dur * sr)
+    out_l = [0.0] * total_samples
+    out_r = [0.0] * total_samples
+
+    def overlay(samples_l, samples_r, start_sec, gain=1.0, pan=0.0):
+        if not samples_l:
+            return
+        start_idx = int(start_sec * sr)
+        if start_idx >= total_samples:
+            return
+        g_l = gain * 0.5 * (1.0 - pan)
+        g_r = gain * 0.5 * (1.0 + pan)
+        limit = min(len(samples_l), total_samples - start_idx)
+        for i in range(limit):
+            out_l[start_idx + i] += samples_l[i] * g_l
+            out_r[start_idx + i] += samples_r[i] * g_r
+
+    # Text 1: Centered Event Text
+    # Starts at t = 2.0s, duration = 2.0s
+    len1 = len(title_center) if title_center else 0
+    if len1 > 0 and key_l:
+        step1 = 2.0 / len1
+        for i, ch in enumerate(title_center):
+            t = 2.0 + i * step1
+            pan = -0.25 + 0.50 * (i / max(1, len1 - 1))
+            vol = random.uniform(0.75, 0.95)
+            if ch == ' ' and spc_l:
+                overlay(spc_l, spc_r, t, gain=vol * 0.85, pan=pan)
+            else:
+                overlay(key_l, key_r, t, gain=vol, pan=pan)
+        # Carriage bell at completion of Text 1
+        if bel_l:
+            overlay(bel_l, bel_r, 4.02, gain=0.90, pan=0.30)
+
+    # Text 2: Date Text at bottom-right
+    # Starts at t = 4.0s, duration = 2.0s
+    len2 = len(title_date) if title_date else 0
+    if len2 > 0 and key_l:
+        step2 = 2.0 / len2
+        for i, ch in enumerate(title_date):
+            t = 4.0 + i * step2
+            pan = 0.20 + 0.30 * (i / max(1, len2 - 1))
+            vol = random.uniform(0.75, 0.95)
+            if ch == ' ' and spc_l:
+                overlay(spc_l, spc_r, t, gain=vol * 0.85, pan=pan)
+            else:
+                overlay(key_l, key_r, t, gain=vol, pan=pan)
+        # Carriage bell at completion of Text 2
+        if bel_l:
+            overlay(bel_l, bel_r, 6.02, gain=0.90, pan=0.45)
+
+    # Normalize/clamp and write 16-bit stereo WAV
+    max_amp = max(max(abs(x) for x in out_l) if out_l else 0.0,
+                  max(abs(x) for x in out_r) if out_r else 0.0,
+                  1.0)
+    norm_factor = 0.92 / max_amp if max_amp > 0.92 else 1.0
+
+    packed = bytearray()
+    for i in range(total_samples):
+        sl = int(max(-1.0, min(1.0, out_l[i] * norm_factor)) * 32767)
+        sr_ = int(max(-1.0, min(1.0, out_r[i] * norm_factor)) * 32767)
+        packed.extend(struct.pack('<hh', sl, sr_))
+
+    os.makedirs(os.path.dirname(os.path.abspath(audio_output_path)), exist_ok=True)
+    with wave.open(audio_output_path, 'wb') as out_wav:
+        out_wav.setnchannels(2)
+        out_wav.setsampwidth(2)
+        out_wav.setframerate(sr)
+        out_wav.writeframes(packed)
+    return audio_output_path
 
 def create_title_slide(cover_path, output_path, width=3840, height=2160,
                        title_center="Vacation 2026", title_bottom_right="",
