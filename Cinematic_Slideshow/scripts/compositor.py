@@ -601,3 +601,62 @@ def prepare_photo_layers(photo_path, bg_output_path, fg_output_path,
 
     return target_w, target_h
 
+
+def generate_photo_caption_overlay(caption_text, out_png, width=3840, height=2160,
+                                   target_w=3000, target_h=2000, border_px=30,
+                                   font_name="georgiab.ttf"):
+    """
+    Renders a transparent PNG overlay at canvas resolution (width x height)
+    with caption_text centered horizontally near the bottom of the photo area,
+    inside the photo frame just above the inner border.
+    Uses multi-direction drop shadow / outline for strong legibility.
+    """
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    font_size = max(36, int(target_h * 0.038))
+    font = get_font(font_name, font_size)
+
+    bb = font.getbbox(caption_text)
+    text_w = bb[2] - bb[0]
+    text_h = bb[3] - bb[1]
+
+    # Constrain text width so it never overflows photo width with safety padding
+    max_text_w = target_w - 80
+    if text_w > max_text_w and text_w > 0:
+        scale_ratio = max_text_w / text_w
+        font_size = max(28, int(font_size * scale_ratio))
+        font = get_font(font_name, font_size)
+        bb = font.getbbox(caption_text)
+        text_w = bb[2] - bb[0]
+        text_h = bb[3] - bb[1]
+
+    bordered_w = target_w + (border_px * 2)
+    bordered_h = target_h + (border_px * 2)
+    fg_x = (width - bordered_w) // 2
+    fg_y = (height - bordered_h) // 2
+
+    # Centered horizontally
+    cx = (width - text_w) // 2
+    # Bottom inner edge of photo is at fg_y + bordered_h - border_px
+    bottom_inner_y = fg_y + bordered_h - border_px
+    cy = bottom_inner_y - text_h - int(target_h * 0.035)
+
+    # Multi-directional dark outline and shadow
+    shadow_offsets = [
+        (-3, -3), (-3, 0), (-3, 3),
+        (0, -3),           (0, 3),
+        (3, -3),  (3, 0),  (3, 3),
+        (-2, -2), (2, -2), (-2, 2), (2, 2),
+        (4, 4),   (5, 5)
+    ]
+    for ox, oy in shadow_offsets:
+        draw.text((cx + ox, cy + oy), caption_text, font=font, fill=(0, 0, 0, 220))
+
+    # Foreground pure white text
+    draw.text((cx, cy), caption_text, font=font, fill=(255, 255, 255, 255))
+
+    img.save(out_png, "PNG")
+    return out_png
+
+

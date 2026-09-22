@@ -236,26 +236,57 @@ def render_photo_clip(shot, out_clip, cache_dir, width, height, fps, encoder, en
     pad_w = target_w + (border_px * 2)
     pad_h = target_h + (border_px * 2)
 
-    vf = (
-        f"[1:v]zoompan=z='{z}':x='{x}':y='{y}':d={frames}:s={target_w}x{target_h}:fps={fps},"
-        f"pad={pad_w}:{pad_h}:{border_px}:{border_px}:color=white[bordered];"
-        f"[0:v][bordered]overlay=(W-w)/2:(H-h)/2,fps={fps}[v]"
-    )
+    caption = shot.get("caption")
+    caption_png = None
+    if caption:
+        caption_png = os.path.join(cache_dir, f"caption_{shot_id:03d}.png")
+        compositor.generate_photo_caption_overlay(
+            caption, caption_png, width=width, height=height,
+            target_w=target_w, target_h=target_h, border_px=border_px
+        )
 
-    cmd = [
-        "ffmpeg", "-y",
-        "-loop", "1", "-t", str(dur), "-i", bg_frame,
-        "-loop", "1", "-t", str(dur), "-i", fg_frame,
-        "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
-        "-filter_complex", vf,
-        "-map", "[v]",
-        "-map", "2:a",
-        "-t", str(dur),
-        "-c:v", encoder, *enc_args,
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
-        out_clip
-    ]
+    if caption_png:
+        vf = (
+            f"[1:v]zoompan=z='{z}':x='{x}':y='{y}':d={frames}:s={target_w}x{target_h}:fps={fps},"
+            f"pad={pad_w}:{pad_h}:{border_px}:{border_px}:color=white[bordered];"
+            f"[0:v][bordered]overlay=(W-w)/2:(H-h)/2[base];"
+            f"[base][2:v]overlay=0:0,fps={fps}[v]"
+        )
+        cmd = [
+            "ffmpeg", "-y",
+            "-loop", "1", "-t", str(dur), "-i", bg_frame,
+            "-loop", "1", "-t", str(dur), "-i", fg_frame,
+            "-loop", "1", "-t", str(dur), "-i", caption_png,
+            "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
+            "-filter_complex", vf,
+            "-map", "[v]",
+            "-map", "3:a",
+            "-t", str(dur),
+            "-c:v", encoder, *enc_args,
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k",
+            out_clip
+        ]
+    else:
+        vf = (
+            f"[1:v]zoompan=z='{z}':x='{x}':y='{y}':d={frames}:s={target_w}x{target_h}:fps={fps},"
+            f"pad={pad_w}:{pad_h}:{border_px}:{border_px}:color=white[bordered];"
+            f"[0:v][bordered]overlay=(W-w)/2:(H-h)/2,fps={fps}[v]"
+        )
+        cmd = [
+            "ffmpeg", "-y",
+            "-loop", "1", "-t", str(dur), "-i", bg_frame,
+            "-loop", "1", "-t", str(dur), "-i", fg_frame,
+            "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
+            "-filter_complex", vf,
+            "-map", "[v]",
+            "-map", "2:a",
+            "-t", str(dur),
+            "-c:v", encoder, *enc_args,
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k",
+            out_clip
+        ]
     run_cmd(cmd, f"Rendering photo clip {out_clip}")
 
 def render_video_clip(shot, out_clip, width, height, fps, encoder, enc_args, border_px=30, margin=80):
@@ -413,6 +444,35 @@ def render_movie(timeline, output_file, temp_dir, width=3840, height=2160, fps=2
                 try:
                     with open(meta_file, "w") as f:
                         json.dump({"title_center": title_center, "title_date": title_date}, f)
+                    if os.path.exists(out_clip):
+                        os.remove(out_clip)
+                except Exception:
+                    pass
+
+        elif s_type == "photo":
+            meta_file = os.path.join(cache_dir, f"photo_meta_{s_id:03d}.json")
+            photo_caption = shot.get("caption", "")
+            photo_changed = True
+            if os.path.exists(meta_file):
+                try:
+                    with open(meta_file, "r") as f:
+                        old_meta = json.load(f)
+                        if (old_meta.get("path") == shot.get("path") and
+                            old_meta.get("caption") == photo_caption and
+                            old_meta.get("duration") == shot.get("duration") and
+                            old_meta.get("motion") == shot.get("motion")):
+                            photo_changed = False
+                except Exception:
+                    pass
+            if photo_changed:
+                try:
+                    with open(meta_file, "w") as f:
+                        json.dump({
+                            "path": shot.get("path"),
+                            "caption": photo_caption,
+                            "duration": shot.get("duration"),
+                            "motion": shot.get("motion")
+                        }, f)
                     if os.path.exists(out_clip):
                         os.remove(out_clip)
                 except Exception:

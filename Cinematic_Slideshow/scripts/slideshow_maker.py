@@ -37,6 +37,8 @@ def main():
     parser.add_argument("--pilot", action="store_true", help="Render a fast 5-shot preview pilot movie")
     parser.add_argument("--pilot-shots", type=int, default=5, help="Number of content shots in pilot (default: 5)")
     parser.add_argument("--pilot-offset", type=int, default=0, help="Offset index for pilot shot selection to test different photos (default: 0)")
+    parser.add_argument("--captions", default=None, help="JSON string or path to JSON file mapping filename -> caption")
+    parser.add_argument("--shot-order", default=None, help="Comma-separated filenames or path to JSON/text file with shot sequence")
     parser.add_argument("--clear-cache", action="store_true", help="Clear temporary render cache before processing")
     parser.add_argument("--temp-dir", default=None, help="Custom temporary cache directory")
 
@@ -81,6 +83,36 @@ def main():
     print(f"Output File:    {output_file}")
     print("================================================================\n")
 
+    captions_map = None
+    if args.captions:
+        if os.path.exists(args.captions):
+            import json
+            with open(args.captions, "r", encoding="utf-8") as f:
+                captions_map = json.load(f)
+        else:
+            import json
+            try:
+                captions_map = json.loads(args.captions)
+            except Exception:
+                pass
+        if isinstance(captions_map, dict) and "captions" in captions_map:
+            captions_map = captions_map["captions"]
+
+    custom_order = None
+    if args.shot_order:
+        if os.path.exists(args.shot_order):
+            import json
+            try:
+                with open(args.shot_order, "r", encoding="utf-8") as f:
+                    custom_order = json.load(f)
+            except Exception:
+                with open(args.shot_order, "r", encoding="utf-8") as f:
+                    custom_order = [line.strip() for line in f if line.strip()]
+        else:
+            custom_order = [x.strip() for x in args.shot_order.split(",") if x.strip()]
+        if isinstance(custom_order, dict) and "order" in custom_order:
+            custom_order = custom_order["order"]
+
     untrimmed = args.trim_videos is None
     timeline = timeline_builder.build_timeline(
         source_dir=source_dir,
@@ -90,20 +122,25 @@ def main():
         untrimmed_videos=untrimmed,
         video_max_dur=args.trim_videos or 6.0,
         seed=args.seed,
-        shuffle=args.shuffle
+        shuffle=args.shuffle if not custom_order else False,
+        captions=captions_map,
+        custom_order=custom_order
     )
 
     if args.pilot:
         print(f"Creating Pilot Preview playlist ({args.pilot_shots} shots, shuffle={args.shuffle})...")
         pilot_shots = [timeline[0], timeline[1]]
         content_shots = [s for s in timeline[2:-1] if s.get("type") in ["photo", "video"]]
-        portraits = [s for s in content_shots if s.get("type") == "photo" and s.get("orientation") == "portrait"]
-        videos = [s for s in content_shots if s.get("type") == "video"]
-        landscapes = [s for s in content_shots if s.get("type") == "photo" and s.get("orientation") == "landscape"]
 
-        rng = random.Random(args.seed) if args.seed is not None else random.Random()
+        if custom_order:
+            pilot_shots.extend(content_shots[:args.pilot_shots])
+        elif args.shuffle:
+            portraits = [s for s in content_shots if s.get("type") == "photo" and s.get("orientation") == "portrait"]
+            videos = [s for s in content_shots if s.get("type") == "video"]
+            landscapes = [s for s in content_shots if s.get("type") == "photo" and s.get("orientation") == "landscape"]
 
-        if args.shuffle:
+            rng = random.Random(args.seed) if args.seed is not None else random.Random()
+
             # 1. Pick 1 random portrait if available
             if portraits:
                 pilot_shots.append(rng.choice(portraits))
@@ -119,6 +156,10 @@ def main():
                 take_count = min(remaining_count, len(avail_landscapes))
                 pilot_shots.extend(rng.sample(avail_landscapes, take_count))
         else:
+            portraits = [s for s in content_shots if s.get("type") == "photo" and s.get("orientation") == "portrait"]
+            videos = [s for s in content_shots if s.get("type") == "video"]
+            landscapes = [s for s in content_shots if s.get("type") == "photo" and s.get("orientation") == "landscape"]
+
             # Deterministic offset-based picking
             if portraits:
                 p_idx = args.pilot_offset % len(portraits)

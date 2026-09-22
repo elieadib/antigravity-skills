@@ -89,9 +89,11 @@ def scan_directory(source_dir, ignore_prefixes=None):
 
 def build_timeline(source_dir, title_center="Vacation 2026", title_date="",
                    title_duration=9.0, photo_hold_min=3.6, photo_hold_max=4.8,
-                   untrimmed_videos=True, video_max_dur=6.0, seed=None, shuffle=True):
+                   untrimmed_videos=True, video_max_dur=6.0, seed=None, shuffle=True,
+                   captions=None, custom_order=None):
     """
     Builds the shot-by-shot timeline structured for narrative flow.
+    If custom_order is provided, media is sequenced according to that list.
     If shuffle=True, photos and videos are picked randomly across the entire album.
     """
     cover_file, photos, videos = scan_directory(source_dir)
@@ -151,7 +153,20 @@ def build_timeline(source_dir, title_center="Vacation 2026", title_date="",
     motion_idx = 0
     trans_idx = 0
 
-    if shuffle:
+    if custom_order:
+        item_by_name = {p["filename"]: p for p in (photos + videos)}
+        combined = []
+        for name in custom_order:
+            clean_name = os.path.basename(name).strip()
+            found = item_by_name.get(clean_name)
+            if not found:
+                for k, v in item_by_name.items():
+                    if k.lower() == clean_name.lower() or os.path.splitext(k.lower())[0] == os.path.splitext(clean_name.lower())[0]:
+                        found = v
+                        break
+            if found and found not in combined:
+                combined.append(found)
+    elif shuffle:
         # Pick photos and videos completely randomly across the entire folder
         shuffled_photos = list(photos)
         shuffled_videos = list(videos)
@@ -205,11 +220,21 @@ def build_timeline(source_dir, title_center="Vacation 2026", title_date="",
         trans = transitions[trans_idx % len(transitions)]
         trans_idx += 1
 
+        caption_text = ""
+        if captions:
+            caption_text = captions.get(item["filename"], captions.get(os.path.basename(item["path"]), ""))
+            if not caption_text:
+                for k, v in captions.items():
+                    if k.lower() == item["filename"].lower() or os.path.splitext(k.lower())[0] == os.path.splitext(item["filename"].lower())[0]:
+                        caption_text = v
+                        break
+
         timeline.append({
             "shot_id": shot_counter,
             "type": item["type"],
             "filename": item["filename"],
             "path": item["path"],
+            "caption": caption_text,
             "orientation": item.get("orientation", "landscape"),
             "duration": round(hold_dur, 2),
             "motion": motion if is_photo else "native_video",
