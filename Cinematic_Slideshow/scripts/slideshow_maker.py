@@ -40,6 +40,7 @@ def main():
     parser.add_argument("--captions", default=None, help="JSON string or path to JSON file mapping filename -> caption")
     parser.add_argument("--shot-order", default=None, help="Comma-separated filenames or path to JSON/text file with shot sequence")
     parser.add_argument("--photo-dur", type=float, default=None, help="Hold duration for photos in seconds (e.g. 8.0)")
+    parser.add_argument("--music", nargs="*", default=None, help="Audio file(s) to mix as background soundtrack with automatic crossfades")
     parser.add_argument("--clear-cache", action="store_true", help="Clear temporary render cache before processing")
     parser.add_argument("--temp-dir", default=None, help="Custom temporary cache directory")
 
@@ -192,6 +193,18 @@ def main():
         suffix = f"_Pilot{args.pilot_offset + 1}" if args.pilot_offset > 0 else "_Pilot"
         output_file = f"{root}{suffix}{ext}"
 
+    music_files = None
+    if args.music:
+        music_files = []
+        for m in args.music:
+            p = os.path.abspath(m) if os.path.isabs(m) else os.path.join(source_dir, m)
+            if os.path.exists(p):
+                music_files.append(p)
+            elif os.path.exists(m):
+                music_files.append(os.path.abspath(m))
+            else:
+                print(f"Warning: Music file not found: {m}")
+
     render_engine.render_movie(
         timeline=timeline,
         output_file=output_file,
@@ -203,7 +216,8 @@ def main():
         letterbox_bars=letterbox_bars,
         title_center=title_center,
         title_date=title_date,
-        margin=args.margin
+        margin=args.margin,
+        music_tracks=music_files
     )
 
 if __name__ == "__main__":

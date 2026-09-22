@@ -447,8 +447,70 @@ def stitch_batch(clips, transitions, out_file, encoder, enc_args, apply_grade=Fa
     ]
     run_cmd(cmd, f"Stitching batch to {out_file}")
 
+def probe_file_duration(path):
+    """Probes media duration in seconds using ffprobe."""
+    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", path]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        return float(json.loads(res.stdout)["format"]["duration"])
+    except Exception:
+        return 0.0
+
+def mix_soundtrack(music_files, output_audio, total_duration, orig_video=None, crossfade_dur=8.0):
+    """
+    Seamlessly mixes and crossfades multiple music tracks to span total_duration.
+    Ducks music slightly during typewriter title sequence and mixes in original video audio fx.
+    """
+    if not music_files:
+        return None
+
+    filter_parts = []
+    inputs = []
+    for idx, f in enumerate(music_files):
+        inputs.extend(["-i", f])
+        filter_parts.append(f"[{idx}:a]aresample=48000[a{idx}];")
+
+    if len(music_files) == 1:
+        current_stream = "a0"
+    else:
+        current_stream = "m1"
+        filter_parts.append(f"[a0][a1]acrossfade=d={crossfade_dur}:c1=tri:c2=tri[{current_stream}];")
+        for idx in range(2, len(music_files)):
+            next_stream = f"m{idx}"
+            filter_parts.append(f"[{current_stream}][a{idx}]acrossfade=d={crossfade_dur}:c1=tri:c2=tri[{next_stream}];")
+            current_stream = next_stream
+
+    fade_out_st = max(0.0, total_duration - 3.5)
+    filter_parts.append(
+        f"[{current_stream}]volume='if(lt(t,6.5), 0.45, if(lt(t,8.5), 0.45 + (t-6.5)*0.275, 1.0))':eval=frame,"
+        f"afade=t=in:st=0:d=1.5,"
+        f"afade=t=out:st={fade_out_st:.2f}:d=3.5[music];"
+    )
+
+    if orig_video and os.path.exists(orig_video):
+        vid_idx = len(music_files)
+        inputs.extend(["-i", orig_video])
+        filter_parts.append(f"[{vid_idx}:a]aresample=48000[orig_fx];")
+        filter_parts.append("[music][orig_fx]amix=inputs=2:duration=first:dropout_transition=2:weights='1 1.2'[aout]")
+        final_map = "[aout]"
+    else:
+        final_map = "[music]"
+
+    cmd = [
+        "ffmpeg", "-y",
+        *inputs,
+        "-filter_complex", "".join(filter_parts),
+        "-map", final_map,
+        "-t", str(total_duration),
+        "-c:a", "aac", "-b:a", "256k",
+        output_audio
+    ]
+    run_cmd(cmd, "Mixing multi-track soundtrack")
+    return output_audio
+
 def render_movie(timeline, output_file, temp_dir, width=3840, height=2160, fps=24,
-                 border_px=30, letterbox_bars=0, title_center="Vacation 2026", title_date="", margin=80):
+                 border_px=30, letterbox_bars=0, title_center="Vacation 2026", title_date="", margin=80,
+                 music_tracks=None):
     """Orchestrates clip rendering, chunk stitching, and final movie creation."""
     encoder, enc_args = detect_best_encoder()
     print(f"Using video encoder: {encoder} {enc_args}")
@@ -556,6 +618,30 @@ def render_movie(timeline, output_file, temp_dir, width=3840, height=2160, fps=2
 
         print("\nStitching chunks into master output with film grade...")
         stitch_batch(chunk_files, chunk_transitions, output_file, encoder, enc_args, apply_grade=True)
+
+    if music_tracks:
+        print("\nMixing and crossfading background soundtrack...")
+        mixed_audio = os.path.join(temp_dir, "master_soundtrack.m4a")
+        total_dur = probe_file_duration(output_file)
+        mix_soundtrack(music_tracks, mixed_audio, total_dur, orig_video=output_file)
+        if os.path.exists(mixed_audio):
+            temp_mux = os.path.join(temp_dir, "movie_with_soundtrack.mp4")
+            cmd_mux = [
+                "ffmpeg", "-y",
+                "-i", output_file,
+                "-i", mixed_audio,
+                "-map", "0:v:0",
+                "-map", "1:a:0",
+                "-c:v", "copy",
+                "-c:a", "copy",
+                "-movflags", "+faststart",
+                temp_mux
+            ]
+            run_cmd(cmd_mux, "Muxing final movie with mastered soundtrack")
+            if os.path.exists(temp_mux):
+                if os.path.exists(output_file):
+                    os.remove(output_file)
+                os.rename(temp_mux, output_file)
 
     print(f"\n=======================================================")
     print(f"SUCCESS! Slideshow successfully rendered at {width}x{height}:")
