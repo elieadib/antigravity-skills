@@ -39,6 +39,7 @@ def main():
     parser.add_argument("--pilot-offset", type=int, default=0, help="Offset index for pilot shot selection to test different photos (default: 0)")
     parser.add_argument("--captions", default=None, help="JSON string or path to JSON file mapping filename -> caption")
     parser.add_argument("--shot-order", default=None, help="Comma-separated filenames or path to JSON/text file with shot sequence")
+    parser.add_argument("--photo-dur", type=float, default=None, help="Hold duration for photos in seconds (e.g. 8.0)")
     parser.add_argument("--clear-cache", action="store_true", help="Clear temporary render cache before processing")
     parser.add_argument("--temp-dir", default=None, help="Custom temporary cache directory")
 
@@ -124,7 +125,8 @@ def main():
         seed=args.seed,
         shuffle=args.shuffle if not custom_order else False,
         captions=captions_map,
-        custom_order=custom_order
+        custom_order=custom_order,
+        photo_dur=args.photo_dur
     )
 
     if args.pilot:

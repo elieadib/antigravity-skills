@@ -621,13 +621,8 @@ def generate_photo_caption_overlay(caption_text, out_png, width=3840, height=216
     font = get_font(font_name, font_size)
 
     # Determine maximum line width:
-    # On vertical photos/videos, allow text to comfortably span across canvas width
-    # without exceeding screen bounds or shrinking font size.
-    is_vertical = target_h > target_w
-    if is_vertical:
-        max_line_w = min(int(width * 0.62), 2400)
-    else:
-        max_line_w = max(target_w - 80, int(width * 0.65))
+    # Captions wrap into 2 balanced lines when long, keeping text centered and compact
+    max_line_w = min(int(width * 0.625), 2400)
 
     lines = wrap_text_to_lines(caption_text, font, max_line_w)
     if not lines:

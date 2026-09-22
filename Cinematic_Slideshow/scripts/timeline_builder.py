@@ -90,7 +90,7 @@ def scan_directory(source_dir, ignore_prefixes=None):
 def build_timeline(source_dir, title_center="Vacation 2026", title_date="",
                    title_duration=9.0, photo_hold_min=3.6, photo_hold_max=4.8,
                    untrimmed_videos=True, video_max_dur=6.0, seed=None, shuffle=True,
-                   captions=None, custom_order=None):
+                   captions=None, custom_order=None, photo_dur=None):
     """
     Builds the shot-by-shot timeline structured for narrative flow.
     If custom_order is provided, media is sequenced according to that list.
@@ -210,7 +210,10 @@ def build_timeline(source_dir, title_center="Vacation 2026", title_date="",
     for item in combined:
         is_photo = item["type"] == "photo"
         if is_photo:
-            hold_dur = rng.uniform(photo_hold_min, photo_hold_max)
+            if photo_dur is not None:
+                hold_dur = float(photo_dur)
+            else:
+                hold_dur = rng.uniform(photo_hold_min, photo_hold_max)
         else:
             hold_dur = item["duration"] if untrimmed_videos else min(item["duration"], video_max_dur)
 

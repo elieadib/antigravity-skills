@@ -196,40 +196,43 @@ def render_photo_clip(shot, out_clip, cache_dir, width, height, fps, encoder, en
     frames = int(dur * fps)
     motion = shot.get("motion", "zoom_in_center")
 
+    step = round(0.18 / max(frames, 1), 6)
+    step_w = round(0.14 / max(frames, 1), 6)
+
     if motion == "zoom_in_center":
-        z = 'min(pzoom+0.0021,1.20)'
+        z = f'min(pzoom+{step},1.20)'
         x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
     elif motion == "zoom_out_center":
-        z = 'if(lte(pzoom,1.0),1.20,max(1.01,pzoom-0.0021))'
+        z = f'if(lte(pzoom,1.0),1.20,max(1.01,pzoom-{step}))'
         x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
     elif motion == "zoom_in_upper":
-        z = 'min(pzoom+0.0021,1.20)'
+        z = f'min(pzoom+{step},1.20)'
         x = 'iw/2-(iw/zoom/2)'
         y = '(ih*0.35)*(1-1/zoom)'
     elif motion == "zoom_out_upper":
-        z = 'if(lte(pzoom,1.0),1.20,max(1.01,pzoom-0.0021))'
+        z = f'if(lte(pzoom,1.0),1.20,max(1.01,pzoom-{step}))'
         x = 'iw/2-(iw/zoom/2)'
         y = '(ih*0.35)*(1-1/zoom)'
     elif motion == "zoom_in_diagonal_left":
-        z = 'min(pzoom+0.0021,1.20)'
+        z = f'min(pzoom+{step},1.20)'
         x = '(iw*0.40)*(1-1/zoom)'
         y = '(ih*0.40)*(1-1/zoom)'
     elif motion == "zoom_out_diagonal_right":
-        z = 'if(lte(pzoom,1.0),1.20,max(1.01,pzoom-0.0021))'
+        z = f'if(lte(pzoom,1.0),1.20,max(1.01,pzoom-{step}))'
         x = '(iw*0.60)*(1-1/zoom)'
         y = '(ih*0.60)*(1-1/zoom)'
     elif motion == "zoom_in_wide":
-        z = 'min(pzoom+0.0016,1.15)'
+        z = f'min(pzoom+{step_w},1.15)'
         x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
     elif motion == "zoom_out_wide":
-        z = 'if(lte(pzoom,1.0),1.16,max(1.01,pzoom-0.0016))'
+        z = f'if(lte(pzoom,1.0),1.16,max(1.01,pzoom-{step_w}))'
         x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
     else:
-        z = 'min(pzoom+0.0021,1.20)'
+        z = f'min(pzoom+{step},1.20)'
         x = 'iw/2-(iw/zoom/2)'
         y = 'ih/2-(ih/zoom/2)'
 
