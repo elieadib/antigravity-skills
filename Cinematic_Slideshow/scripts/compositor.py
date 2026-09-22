@@ -614,7 +614,7 @@ def generate_photo_caption_overlay(caption_text, out_png, width=3840, height=216
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    font_size = max(36, int(target_h * 0.038))
+    font_size = max(54, int(target_h * 0.057))
     font = get_font(font_name, font_size)
 
     bb = font.getbbox(caption_text)
@@ -625,7 +625,7 @@ def generate_photo_caption_overlay(caption_text, out_png, width=3840, height=216
     max_text_w = target_w - 80
     if text_w > max_text_w and text_w > 0:
         scale_ratio = max_text_w / text_w
-        font_size = max(28, int(font_size * scale_ratio))
+        font_size = max(38, int(font_size * scale_ratio))
         font = get_font(font_name, font_size)
         bb = font.getbbox(caption_text)
         text_w = bb[2] - bb[0]
@@ -644,14 +644,15 @@ def generate_photo_caption_overlay(caption_text, out_png, width=3840, height=216
 
     # Multi-directional dark outline and shadow
     shadow_offsets = [
-        (-3, -3), (-3, 0), (-3, 3),
-        (0, -3),           (0, 3),
-        (3, -3),  (3, 0),  (3, 3),
+        (-4, -4), (-4, 0), (-4, 4),
+        (0, -4),           (0, 4),
+        (4, -4),  (4, 0),  (4, 4),
+        (-3, -3), (3, -3), (-3, 3), (3, 3),
         (-2, -2), (2, -2), (-2, 2), (2, 2),
-        (4, 4),   (5, 5)
+        (5, 5),   (6, 6)
     ]
     for ox, oy in shadow_offsets:
-        draw.text((cx + ox, cy + oy), caption_text, font=font, fill=(0, 0, 0, 220))
+        draw.text((cx + ox, cy + oy), caption_text, font=font, fill=(0, 0, 0, 230))
 
     # Foreground pure white text
     draw.text((cx, cy), caption_text, font=font, fill=(255, 255, 255, 255))
