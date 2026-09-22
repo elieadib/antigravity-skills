@@ -13,6 +13,7 @@ This repository holds your global skills for **Google Antigravity**, synchronize
 7. **music-folder-renamer**: Extracts Band name, Album name, and Year from MP3 and FLAC audio tags, and standardizes album folder names to `BandName - AlbumName - Year - mp3` or `BandName - AlbumName - Year - Flac`.
 8. **music-track-renamer**: Extracts Band name, Album name, and Track name from MP3 and FLAC audio tags, and standardizes all music filenames inside every folder to `BandName - AlbumName - TrackName`.
 9. **Tag_as_AI**: Audits and standardizes audio metadata across music directories or individual tracks to tag them as AI-generated music. Sets Genre tags to designated AI genres (default: `AI_Rock`, or custom e.g. `AI_Jazz`), supports prefixing existing genres with `AI_`, and allows optional AI grouping and comment markers while preserving artwork and audio metadata intact.
+10. **+faststart**: Losslessly optimizes MP4, MOV, and M4V videos for instant progressive web streaming by moving the `moov` atom metadata index to the beginning of the file (`ffmpeg -c copy -movflags +faststart`), eliminating initial buffering delays and enabling instant playback across web browsers and mobile devices.
 
 ---
 
