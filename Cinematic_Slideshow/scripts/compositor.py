@@ -42,6 +42,47 @@ def create_black_frame(width, height, output_path):
     canvas.save(output_path, quality=95)
     return output_path
 
+def wrap_text_to_lines(text, font, max_width):
+    """Wraps text into balanced lines if it exceeds max_width."""
+    if not text:
+        return []
+    if "\n" in text:
+        return text.split("\n")
+    bbox = font.getbbox(text)
+    tw = bbox[2] - bbox[0]
+    if tw <= max_width:
+        return [text]
+    words = text.split(" ")
+    if len(words) <= 1:
+        return [text]
+    best_split = 1
+    min_diff = float("inf")
+    for i in range(1, len(words)):
+        l1 = " ".join(words[:i])
+        l2 = " ".join(words[i:])
+        w1 = font.getbbox(l1)[2] - font.getbbox(l1)[0]
+        w2 = font.getbbox(l2)[2] - font.getbbox(l2)[0]
+        if w1 <= max_width and w2 <= max_width:
+            diff = abs(w1 - w2)
+            if diff < min_diff:
+                min_diff = diff
+                best_split = i
+    if min_diff < float("inf"):
+        return [" ".join(words[:best_split]), " ".join(words[best_split:])]
+    lines = []
+    curr = []
+    for w in words:
+        test = " ".join(curr + [w])
+        if (font.getbbox(test)[2] - font.getbbox(test)[0]) <= max_width:
+            curr.append(w)
+        else:
+            if curr:
+                lines.append(" ".join(curr))
+            curr = [w]
+    if curr:
+        lines.append(" ".join(curr))
+    return lines
+
 def prepare_title_layers(cover_path, bg_output_path, fg_output_path,
                          width=3840, height=2160, title_center="Vacation 2026",
                          title_bottom_right="", border_px=30, blur_radius=35,
@@ -98,19 +139,35 @@ def prepare_title_layers(cover_path, bg_output_path, fg_output_path,
     # Save clean foreground photo (without baked text)
     fg_rgba.convert("RGB").save(fg_output_path, quality=95)
 
-    # Typography sizing proportional to photo height
-    center_font_size = int(target_h * 0.055)
-    date_font_size = int(target_h * 0.032)
+    # Typography sizing proportional to photo height (50% bigger)
+    center_font_size = int(target_h * 0.0825)
+    date_font_size = int(target_h * 0.048)
 
     font_center = get_font("georgiab.ttf", center_font_size)
     font_date = get_font("georgia.ttf", date_font_size)
 
-    bbox_c = font_center.getbbox(title_center) if title_center else (0, 0, 0, 0)
-    tw_c, th_c = bbox_c[2] - bbox_c[0], bbox_c[3] - bbox_c[1]
-    cx = width // 2
-    cy = height // 2
-    x_c = cx - tw_c // 2
-    y_c = cy - th_c // 2
+    lines_center = wrap_text_to_lines(title_center, font_center, int(target_w * 0.88))
+    line_positions = []
+    if lines_center:
+        line_heights = []
+        for line in lines_center:
+            bb = font_center.getbbox(line)
+            line_heights.append(bb[3] - bb[1])
+        line_spacing = int(center_font_size * 0.25)
+        total_text_h = sum(line_heights) + line_spacing * (len(lines_center) - 1)
+        y_curr = (height - total_text_h) // 2
+        for idx, line in enumerate(lines_center):
+            bb = font_center.getbbox(line)
+            lw = bb[2] - bb[0]
+            lx = (width - lw) // 2
+            line_positions.append({
+                "text": line,
+                "x": lx,
+                "y": y_curr,
+                "w": lw,
+                "h": line_heights[idx]
+            })
+            y_curr += line_heights[idx] + line_spacing
 
     photo_x2 = (width + target_w) // 2
     photo_y2 = (height + target_h) // 2
@@ -127,8 +184,9 @@ def prepare_title_layers(cover_path, bg_output_path, fg_output_path,
         "target_h": target_h,
         "center_font_size": center_font_size,
         "date_font_size": date_font_size,
-        "x_c": x_c,
-        "y_c": y_c,
+        "line_positions": line_positions,
+        "x_c": line_positions[0]["x"] if line_positions else width // 2,
+        "y_c": line_positions[0]["y"] if line_positions else height // 2,
         "rx": rx,
         "ry": ry,
         "title_center": title_center,
@@ -148,10 +206,15 @@ def generate_typewriter_overlay(output_path, layout_info, dur=9.0, fps=24, width
     """
     title_center = layout_info.get("title_center", "")
     title_date = layout_info.get("title_date", "")
-    center_font_size = layout_info.get("center_font_size", 100)
-    date_font_size = layout_info.get("date_font_size", 60)
-    x_c = layout_info.get("x_c", width // 2)
-    y_c = layout_info.get("y_c", height // 2)
+    center_font_size = layout_info.get("center_font_size", 150)
+    date_font_size = layout_info.get("date_font_size", 90)
+    line_positions = layout_info.get("line_positions", [])
+    if not line_positions and title_center:
+        line_positions = [{
+            "text": title_center,
+            "x": layout_info.get("x_c", width // 2),
+            "y": layout_info.get("y_c", height // 2)
+        }]
     rx = layout_info.get("rx", width - 300)
     ry = layout_info.get("ry", height - 200)
 
@@ -163,8 +226,8 @@ def generate_typewriter_overlay(output_path, layout_info, dur=9.0, fps=24, width
     f_start2 = int(4.0 * fps)
 
     # Center text typing duration: exactly 2.0s
-    len1 = len(title_center)
-    f_dur1 = int(2.0 * fps) if len1 > 0 else 1
+    total_chars1 = sum(len(lp["text"]) for lp in line_positions)
+    f_dur1 = int(2.0 * fps) if total_chars1 > 0 else 1
 
     # Date text typing duration: exactly 2.0s
     len2 = len(title_date)
@@ -184,21 +247,32 @@ def generate_typewriter_overlay(output_path, layout_info, dur=9.0, fps=24, width
 
     for f in range(total_frames):
         t = f / fps
-        if t < 2.0 or (not title_center and not title_date):
+        if t < 2.0 or (not line_positions and not title_date):
             proc.stdin.write(empty_bytes)
             continue
 
-        # Substring for title 1
-        if not title_center:
-            sub1 = ""
+        # Substrings for title 1 lines
+        if not line_positions:
+            typed_lines = []
         elif f < f_start1:
-            sub1 = ""
+            typed_lines = [""] * len(line_positions)
         elif f < f_start1 + f_dur1:
             progress1 = (f - f_start1) / f_dur1
-            c1_len = max(1, min(len1, int(round(progress1 * len1))))
-            sub1 = title_center[:c1_len]
+            c1_len = max(1, min(total_chars1, int(round(progress1 * total_chars1))))
+            chars_left = c1_len
+            typed_lines = []
+            for lp in line_positions:
+                ltxt = lp["text"]
+                if chars_left <= 0:
+                    typed_lines.append("")
+                elif chars_left >= len(ltxt):
+                    typed_lines.append(ltxt)
+                    chars_left -= len(ltxt)
+                else:
+                    typed_lines.append(ltxt[:chars_left])
+                    chars_left = 0
         else:
-            sub1 = title_center
+            typed_lines = [lp["text"] for lp in line_positions]
 
         # Substring for title 2 (starts at t = 4.0s)
         if not title_date or f < f_start2:
@@ -210,17 +284,19 @@ def generate_typewriter_overlay(output_path, layout_info, dur=9.0, fps=24, width
         else:
             sub2 = title_date
 
-        state_key = (sub1, sub2)
+        state_key = (tuple(typed_lines), sub2)
         if state_key in cached_bytes:
             proc.stdin.write(cached_bytes[state_key])
         else:
             img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
             draw = ImageDraw.Draw(img)
-            if sub1:
-                draw.text((x_c + 4, y_c + 4), sub1, font=font_center, fill=(0, 0, 0, 230))
-                draw.text((x_c, y_c), sub1, font=font_center, fill=(255, 255, 255, 255))
+            for idx, lp in enumerate(line_positions):
+                sub = typed_lines[idx] if idx < len(typed_lines) else ""
+                if sub:
+                    draw.text((lp["x"] + 5, lp["y"] + 5), sub, font=font_center, fill=(0, 0, 0, 230))
+                    draw.text((lp["x"], lp["y"]), sub, font=font_center, fill=(255, 255, 255, 255))
             if sub2:
-                draw.text((rx + 3, ry + 3), sub2, font=font_date, fill=(0, 0, 0, 220))
+                draw.text((rx + 4, ry + 4), sub2, font=font_date, fill=(0, 0, 0, 220))
                 draw.text((rx, ry), sub2, font=font_date, fill=(245, 235, 210, 255))
             raw = img.tobytes()
             cached_bytes[state_key] = raw
@@ -374,11 +450,16 @@ def create_title_slide(cover_path, output_path, width=3840, height=2160,
     draw = ImageDraw.Draw(canvas)
     font_center = get_font("georgiab.ttf", layout_info["center_font_size"])
     font_date = get_font("georgia.ttf", layout_info["date_font_size"])
-    if title_center:
-        draw.text((layout_info["x_c"] + 4, layout_info["y_c"] + 4), title_center, font=font_center, fill=(0, 0, 0, 230))
+    line_positions = layout_info.get("line_positions", [])
+    if line_positions:
+        for lp in line_positions:
+            draw.text((lp["x"] + 5, lp["y"] + 5), lp["text"], font=font_center, fill=(0, 0, 0, 230))
+            draw.text((lp["x"], lp["y"]), lp["text"], font=font_center, fill=(255, 255, 255, 255))
+    elif title_center:
+        draw.text((layout_info["x_c"] + 5, layout_info["y_c"] + 5), title_center, font=font_center, fill=(0, 0, 0, 230))
         draw.text((layout_info["x_c"], layout_info["y_c"]), title_center, font=font_center, fill=(255, 255, 255, 255))
     if title_bottom_right:
-        draw.text((layout_info["rx"] + 3, layout_info["ry"] + 3), title_bottom_right, font=font_date, fill=(0, 0, 0, 220))
+        draw.text((layout_info["rx"] + 4, layout_info["ry"] + 4), title_bottom_right, font=font_date, fill=(0, 0, 0, 220))
         draw.text((layout_info["rx"], layout_info["ry"]), title_bottom_right, font=font_date, fill=(245, 235, 210, 255))
 
     canvas.save(output_path, quality=95)
