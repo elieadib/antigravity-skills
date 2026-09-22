@@ -398,6 +398,26 @@ def render_movie(timeline, output_file, temp_dir, width=3840, height=2160, fps=2
 
         print(f"[{idx+1}/{total}] Shot #{s_id} ({s_type}, dur={shot.get('duration')}s): {shot.get('filename', 'solid')}")
 
+        if s_type == "title_slide":
+            meta_file = os.path.join(temp_dir, "title_meta.json")
+            title_changed = True
+            if os.path.exists(meta_file):
+                try:
+                    with open(meta_file, "r") as f:
+                        old_meta = json.load(f)
+                        if old_meta.get("title_center") == title_center and old_meta.get("title_date") == title_date:
+                            title_changed = False
+                except Exception:
+                    pass
+            if title_changed:
+                try:
+                    with open(meta_file, "w") as f:
+                        json.dump({"title_center": title_center, "title_date": title_date}, f)
+                    if os.path.exists(out_clip):
+                        os.remove(out_clip)
+                except Exception:
+                    pass
+
         if not is_valid_clip(out_clip):
             if s_type == "black_intro" or s_type == "black_outro":
                 render_black_clip(shot, out_clip, width, height, fps, encoder, enc_args)

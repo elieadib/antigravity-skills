@@ -139,14 +139,40 @@ def prepare_title_layers(cover_path, bg_output_path, fg_output_path,
     # Save clean foreground photo (without baked text)
     fg_rgba.convert("RGB").save(fg_output_path, quality=95)
 
-    # Typography sizing proportional to photo height (50% bigger)
-    center_font_size = int(target_h * 0.0825)
+    # Typography sizing proportional to photo height (50% bigger base)
+    max_line_w = int(target_w * 0.88)
+    base_center_font_size = int(target_h * 0.0825)
     date_font_size = int(target_h * 0.048)
 
-    font_center = get_font("georgiab.ttf", center_font_size)
+    font_center = get_font("georgiab.ttf", base_center_font_size)
     font_date = get_font("georgia.ttf", date_font_size)
 
-    lines_center = wrap_text_to_lines(title_center, font_center, int(target_w * 0.88))
+    center_font_size = base_center_font_size
+    lines_center = wrap_text_to_lines(title_center, font_center, max_line_w)
+
+    # If title is long and wraps into > 2 lines, search down to 0.065 * target_h to find
+    # a clean, balanced 2-line split so no orphan single words appear.
+    if len(lines_center) > 2 and title_center and " " in title_center:
+        words = title_center.split(" ")
+        for fs in range(base_center_font_size - 2, int(target_h * 0.065) - 1, -2):
+            f_test = get_font("georgiab.ttf", fs)
+            best_diff = float("inf")
+            best_pair = None
+            for i in range(1, len(words)):
+                l1 = " ".join(words[:i])
+                l2 = " ".join(words[i:])
+                w1 = f_test.getbbox(l1)[2] - f_test.getbbox(l1)[0]
+                w2 = f_test.getbbox(l2)[2] - f_test.getbbox(l2)[0]
+                if w1 <= max_line_w and w2 <= max_line_w:
+                    diff = abs(w1 - w2)
+                    if diff < best_diff:
+                        best_diff = diff
+                        best_pair = [l1, l2]
+            if best_pair:
+                center_font_size = fs
+                font_center = f_test
+                lines_center = best_pair
+                break
     line_positions = []
     if lines_center:
         line_heights = []
