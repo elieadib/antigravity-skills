@@ -97,8 +97,13 @@ def main():
                 captions_map = json.loads(args.captions)
             except Exception:
                 pass
-        if isinstance(captions_map, dict) and "captions" in captions_map:
-            captions_map = captions_map["captions"]
+        if isinstance(captions_map, dict):
+            if not args.title and "title_center" in captions_map:
+                title_center = captions_map["title_center"]
+            if not args.date and "title_date" in captions_map:
+                title_date = captions_map["title_date"]
+            if "captions" in captions_map:
+                captions_map = captions_map["captions"]
 
     custom_order = None
     if args.shot_order:
