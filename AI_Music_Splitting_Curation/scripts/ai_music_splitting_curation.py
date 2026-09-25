@@ -85,6 +85,22 @@ def clean_album_name(raw_name):
         return 'The Horizon Still Calls · Desert Drift'
     if 'The Valley' in s:
         return 'The Valley'
+    if 'The Weight of Light' in s:
+        return 'The Weight of Light'
+    if 'Azúcar y Café' in s:
+        return 'Azúcar y Café'
+    if 'Fado de Amália Rodrigues' in s:
+        return 'Fado de Amália Rodrigues'
+    if 'Lisboa Azul' in s:
+        return 'Lucia Carvalho - Lisboa Azul'
+    if 'Pacific Blondes' in s and 'Longer Way' in s:
+        return 'Pacific Blondes - Longer Way'
+    if 'Virtude' in s and 'After the Feeling' in s:
+        return 'Virtude – After the Feeling'
+    if 'The Best Fado of 2026' in s:
+        return 'The Best Fado of 2026'
+    if 'Where Time Dissolves' in s:
+        return 'Where Time Dissolves'
     
     # General patterns
     s = re.sub(r'\[Full Album\]', '', s, flags=re.I)
@@ -207,8 +223,9 @@ def process_album(src_file, target_dir, args):
         print(f"  Audio duration: {total_dur:.2f}s ({int(total_dur//60)}m {total_dur%60:.1f}s)")
 
         # Step 2: Query YouTube
-        print(f"  Step 2: Querying YouTube for '{sim_name}'...")
-        cmd_yt = [YT_DLP, f"ytsearch1:{sim_name}", "-j", "--skip-download"]
+        raw_clean = re.sub(r'\.(m4a|mp3|flac|wav|aac)$', '', raw_fn, flags=re.I).strip()
+        print(f"  Step 2: Querying YouTube for '{raw_clean}'...")
+        cmd_yt = [YT_DLP, f"ytsearch1:{raw_clean}", "-j", "--skip-download"]
         res_yt = subprocess.run(cmd_yt, capture_output=True, text=True)
         yt_data = {}
         if res_yt.returncode == 0 and res_yt.stdout.strip():
@@ -217,8 +234,27 @@ def process_album(src_file, target_dir, args):
             except Exception:
                 pass
 
+        if (not yt_data.get("chapters") or len(yt_data.get("chapters", [])) < 2) and sim_name != raw_clean:
+            cmd_yt_sim = [YT_DLP, f"ytsearch1:{sim_name}", "-j", "--skip-download"]
+            res_yt_sim = subprocess.run(cmd_yt_sim, capture_output=True, text=True)
+            if res_yt_sim.returncode == 0 and res_yt_sim.stdout.strip():
+                try:
+                    alt_data = json.loads(res_yt_sim.stdout.strip().splitlines()[0])
+                    if alt_data.get("chapters") and len(alt_data.get("chapters", [])) >= 2:
+                        yt_data = alt_data
+                except Exception:
+                    pass
+
         video_id = yt_data.get("id")
-        artist = yt_data.get("uploader") or yt_data.get("channel") or "Various Artists"
+        uploader = yt_data.get("uploader") or yt_data.get("channel") or ""
+        if " - " in sim_name:
+            artist = sim_name.split(" - ")[0].strip()
+        elif " – " in sim_name:
+            artist = sim_name.split(" – ")[0].strip()
+        elif uploader:
+            artist = uploader
+        else:
+            artist = "Various Artists"
         print(f"  Matched Release: '{yt_data.get('title', sim_name)}' (Artist: {artist})")
 
         # Step 3: Extract Tracklist
