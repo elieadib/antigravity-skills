@@ -110,8 +110,17 @@ def get_video_info(path):
     }
 
 def is_valid_clip(filepath):
-    """Checks if clip file exists and is non-empty."""
-    return os.path.exists(filepath) and os.path.getsize(filepath) > 50000
+    """Checks if clip file exists, is non-empty, and can be read by ffprobe."""
+    if not (os.path.exists(filepath) and os.path.getsize(filepath) > 10000):
+        return False
+    try:
+        res = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", filepath],
+            capture_output=True, text=True, timeout=10
+        )
+        return res.returncode == 0
+    except Exception:
+        return False
 
 def render_black_clip(shot, out_clip, width, height, fps, encoder, enc_args):
     dur = shot["duration"]
@@ -293,7 +302,7 @@ def render_photo_clip(shot, out_clip, cache_dir, width, height, fps, encoder, en
     run_cmd(cmd, f"Rendering photo clip {out_clip}")
 
 def render_video_clip(shot, out_clip, width, height, fps, encoder, enc_args, border_px=30, margin=80):
-    dur = shot["duration"]
+    dur = max(3.0, shot["duration"])
     path = shot["path"]
     info = get_video_info(path)
 
@@ -339,15 +348,16 @@ def render_video_clip(shot, out_clip, width, height, fps, encoder, enc_args, bor
 
     fade_out_start = max(0, dur - 0.5)
 
+    vid_in = ["-stream_loop", "-1", "-i", path] if info.get("duration", 0) < 3.0 else ["-i", path]
     if info["has_audio"]:
         af = f"[0:a]aformat=sample_rates=48000:channel_layouts=stereo,afade=t=in:ss=0:d=0.5,afade=t=out:st={fade_out_start:.2f}:d=0.5[a]"
-        inputs = ["-i", path]
+        inputs = [*vid_in]
         if caption_png:
             inputs.extend(["-loop", "1", "-t", str(dur), "-i", caption_png])
         fc = f"{filter_str};{af}"
         map_a = "[a]"
     else:
-        inputs = ["-i", path]
+        inputs = [*vid_in]
         if caption_png:
             inputs.extend(["-loop", "1", "-t", str(dur), "-i", caption_png])
             # filter_str uses [1:v] for caption overlay
@@ -398,22 +408,26 @@ def stitch_batch(clips, transitions, out_file, encoder, enc_args, apply_grade=Fa
     filter_parts = []
 
     cum_duration = durations[0]
-    td = 0.8
+    base_td = 0.8
 
     for i in range(len(clips) - 1):
         trans = transitions[i] if i < len(transitions) else "fade"
         if trans not in ["fade", "fadewhite", "smoothleft", "smoothright", "fadeblack"]:
             trans = "fade"
 
-        offset = cum_duration - td
+        # Dynamically cap transition duration to safe fraction of both clips
+        cur_td = min(base_td, durations[i] * 0.45, durations[i+1] * 0.45)
+        cur_td = max(0.1, round(cur_td, 3))
+
+        offset = max(0.0, cum_duration - cur_td)
         next_v = f"[v{i+1}]"
         next_a = f"[a{i+1}]"
 
         prev_v = v_nodes[-1]
         prev_a = a_nodes[-1]
 
-        v_filter = f"{prev_v}[{i+1}:v]xfade=transition={trans}:duration={td}:offset={offset:.3f}{next_v}"
-        a_filter = f"{prev_a}[{i+1}:a]acrossfade=d={td}{next_a}"
+        v_filter = f"{prev_v}[{i+1}:v]xfade=transition={trans}:duration={cur_td:.2f}:offset={offset:.3f}{next_v}"
+        a_filter = f"{prev_a}[{i+1}:a]acrossfade=d={cur_td:.2f}{next_a}"
 
         filter_parts.append(v_filter)
         filter_parts.append(a_filter)
@@ -421,7 +435,7 @@ def stitch_batch(clips, transitions, out_file, encoder, enc_args, apply_grade=Fa
         v_nodes.append(next_v)
         a_nodes.append(next_a)
 
-        cum_duration = cum_duration + durations[i+1] - td
+        cum_duration = offset + durations[i+1]
 
     final_v = v_nodes[-1]
     final_a = a_nodes[-1]
@@ -611,7 +625,10 @@ def render_movie(timeline, output_file, temp_dir, width=3840, height=2160, fps=2
             c_trans = transitions[i:i+chunk_size-1]
             c_out = os.path.join(temp_dir, f"chunk_{i//chunk_size:02d}.mp4")
             print(f"Stitching Chunk {i//chunk_size + 1}/{(len(rendered_clips)+chunk_size-1)//chunk_size} ({len(c_clips)} clips)...")
-            stitch_batch(c_clips, c_trans, c_out, encoder, enc_args, apply_grade=False)
+            if is_valid_clip(c_out) and os.path.getsize(c_out) > 1000000:
+                print(f"  -> Reusing existing chunk: {os.path.basename(c_out)}")
+            else:
+                stitch_batch(c_clips, c_trans, c_out, encoder, enc_args, apply_grade=False)
             chunk_files.append(c_out)
             if i + chunk_size < len(rendered_clips):
                 chunk_transitions.append(transitions[i+chunk_size-1])
