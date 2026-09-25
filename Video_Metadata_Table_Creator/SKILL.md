@@ -1,15 +1,15 @@
 ---
-name: Video_Specs_Inspector
+name: Video_Metadata_Table_Creator
 description: >-
-  Inspects video files in a specified directory (or single file) and generates a structured
-  specs table detailing Video Bitrate (kbits/sec), Audio Bitrate (kbit/s), Resolution, Video & Audio
+  Inspects video files in a specified directory (or single file) and builds a structured
+  metadata table detailing Video Bitrate (kbits/sec), Audio Bitrate (kbit/s), Resolution, Video & Audio
   Codecs, FPS, Duration, and File Size. Supports recursive directory scanning, multi-threaded ffprobe
   analysis, flexible sorting, and multiple output formats (Markdown table, CLI border table, CSV, JSON).
   Use whenever the user asks to inspect video specs, list video bitrates, check audio bitrates, get video
-  resolutions or codecs, build a video metadata table, or audit video files in a folder.
+  resolutions or codecs, build a video metadata table, create a video specs table, or run Video_Metadata_Table_Creator.
 ---
 
-# Video Specs Inspector (`Video_Specs_Inspector`)
+# Video Metadata Table Creator (`Video_Metadata_Table_Creator`)
 
 A high-performance media analysis skill that scans any directory or video collection and compiles a clean, detailed technical table providing video bitrate, audio bitrate, resolution, codecs, frame rate, duration, and file size.
 
@@ -38,41 +38,41 @@ A high-performance media analysis skill that scans any directory or video collec
 
 ## CLI Usage & Commands
 
-The core script is located at [scripts/video_specs_inspector.py](./scripts/video_specs_inspector.py). Shell wrappers [video-specs-inspector.sh](./video-specs-inspector.sh) (Mac/Linux) and [video-specs-inspector.bat](./video-specs-inspector.bat) (Windows) are provided for convenience.
+The core script is located at [scripts/video_metadata_table_creator.py](./scripts/video_metadata_table_creator.py). Shell wrappers [video-metadata-table-creator.sh](./video-metadata-table-creator.sh) (Mac/Linux) and [video-metadata-table-creator.bat](./video-metadata-table-creator.bat) (Windows) are provided for convenience.
 
 ### 1. Inspect All Videos in a Directory (Markdown Table Output)
 ```bash
-python3 "$HOME/.gemini/config/skills/Video_Specs_Inspector/scripts/video_specs_inspector.py" "/path/to/video/folder"
+python3 "$HOME/.gemini/config/skills/Video_Metadata_Table_Creator/scripts/video_metadata_table_creator.py" "/path/to/video/folder"
 ```
-*(Or via bash shortcut: `bash "$HOME/.gemini/config/skills/Video_Specs_Inspector/video-specs-inspector.sh" "/path/to/video/folder"`)*
+*(Or via bash shortcut: `bash "$HOME/.gemini/config/skills/Video_Metadata_Table_Creator/video-metadata-table-creator.sh" "/path/to/video/folder"`)*
 
 ### 2. Recursive Scan Across All Subdirectories (`-r`)
 ```bash
-python3 "$HOME/.gemini/config/skills/Video_Specs_Inspector/scripts/video_specs_inspector.py" "/path/to/video/folder" -r
+python3 "$HOME/.gemini/config/skills/Video_Metadata_Table_Creator/scripts/video_metadata_table_creator.py" "/path/to/video/folder" -r
 ```
 
 ### 3. Display as a Terminal Bordered Table
 ```bash
-python3 "$HOME/.gemini/config/skills/Video_Specs_Inspector/scripts/video_specs_inspector.py" "/path/to/video/folder" --format table
+python3 "$HOME/.gemini/config/skills/Video_Metadata_Table_Creator/scripts/video_metadata_table_creator.py" "/path/to/video/folder" --format table
 ```
 
 ### 4. Sort by Video Bitrate (Highest to Lowest)
 ```bash
-python3 "$HOME/.gemini/config/skills/Video_Specs_Inspector/scripts/video_specs_inspector.py" "/path/to/video/folder" --sort vbitrate --reverse
+python3 "$HOME/.gemini/config/skills/Video_Metadata_Table_Creator/scripts/video_metadata_table_creator.py" "/path/to/video/folder" --sort vbitrate --reverse
 ```
 
 ### 5. Export Directly to a CSV or Markdown File
 ```bash
 # Export to CSV
-python3 "$HOME/.gemini/config/skills/Video_Specs_Inspector/scripts/video_specs_inspector.py" "/path/to/video/folder" --csv "/path/to/report.csv"
+python3 "$HOME/.gemini/config/skills/Video_Metadata_Table_Creator/scripts/video_metadata_table_creator.py" "/path/to/video/folder" --csv "/path/to/report.csv"
 
 # Export to Markdown file
-python3 "$HOME/.gemini/config/skills/Video_Specs_Inspector/scripts/video_specs_inspector.py" "/path/to/video/folder" --md "/path/to/report.md"
+python3 "$HOME/.gemini/config/skills/Video_Metadata_Table_Creator/scripts/video_metadata_table_creator.py" "/path/to/video/folder" --md "/path/to/report.md"
 ```
 
 ### 6. Inspect a Single Video File
 ```bash
-python3 "$HOME/.gemini/config/skills/Video_Specs_Inspector/scripts/video_specs_inspector.py" "/path/to/movie.mp4"
+python3 "$HOME/.gemini/config/skills/Video_Metadata_Table_Creator/scripts/video_metadata_table_creator.py" "/path/to/movie.mp4"
 ```
 
 ---
@@ -95,8 +95,8 @@ python3 "$HOME/.gemini/config/skills/Video_Specs_Inspector/scripts/video_specs_i
 
 ## Agent Guidelines
 
-When the user asks to inspect videos in a folder:
+When the user asks to inspect videos or build a video metadata table:
 1. Ask the user for the folder path if not provided.
-2. Execute `video_specs_inspector.py` targeting that directory.
+2. Execute `video_metadata_table_creator.py` targeting that directory.
 3. Render the resulting Markdown table directly into your response.
 4. If the user asks for CSV, file export, or specific sorting (e.g. find lowest/highest bitrate videos), pass the corresponding flags (`--csv`, `--sort vbitrate`, etc.).
