@@ -312,7 +312,7 @@ def render_video_clip(shot, out_clip, width, height, fps, encoder, enc_args, bor
     caption_png = None
     if caption:
         cache_dir = os.path.dirname(out_clip)
-        shot_id = shot.get("id", 0)
+        shot_id = shot.get("shot_id", shot.get("id", 0))
         caption_png = os.path.join(cache_dir, f"caption_vid_{shot_id:03d}.png")
         compositor.generate_photo_caption_overlay(
             caption, caption_png, width=width, height=height,
