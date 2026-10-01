@@ -101,6 +101,50 @@ def clean_album_name(raw_name):
         return 'The Best Fado of 2026'
     if 'Where Time Dissolves' in s:
         return 'Where Time Dissolves'
+    if 'Santana Jams with The Eagles' in s or 'One Of These Nights' in s:
+        return 'Santana & The Eagles - One Of These Nights'
+    if 'Recursive Dawn' in s and 'Delic Relic' in s:
+        return 'Recursive Dawn - Delic Relic'
+    if 'BENEATH THE BLACK ALTAR' in s:
+        return 'Moonlit Paradox - Beneath the Black Altar'
+    if 'Blind Faith' in s and 'Hyde Park' in s:
+        return 'Blind Faith – Live at Hyde Park 1969'
+    if 'Sultans of Latin Rock' in s:
+        return 'Carlos Santana & Mark Knopfler – The Sultans of Latin Rock'
+    if 'Supernatural Albatross' in s:
+        return 'Carlos Santana & Peter Green – Supernatural Albatross 1969'
+    if 'Blues Meets Latin Fire' in s:
+        if 'Legendary Session Tribute Live Experience)' in s or 'Experience)' in s:
+            return 'Carlos Santana – Blues Meets Latin Fire'
+        return 'Carlos Santana – Blues Meets Latin Fire (Extended)'
+    if 'Midnight Blues Journey' in s:
+        return 'Carlos Santana – Midnight Blues Journey'
+    if 'El Helwa De' in s or 'الحلوة دي' in s:
+        return 'Lahn Al Asalah - El Helwa De'
+    if 'Nassam Alayna' in s or 'نسم علينا الهوى' in s:
+        return 'Fairuz - Nassam Alayna El Hawa'
+    if 'Ya Ana Ya Ana' in s or 'يا أنا يا أنا' in s:
+        return 'Fairuz - Ya Ana Ya Ana'
+    if 'Gary Moore & Santana' in s and 'Midnight Blues' in s:
+        return 'Gary Moore & Santana – Midnight Blues'
+    if 'Gary Moore' in s and 'Led Zeppelin' in s:
+        return 'Gary Moore & Led Zeppelin – Midnight Riffs Above the Mountains'
+    if 'Greek Music 2026' in s:
+        return 'Greek Music 2026 – Beach Café Vibes'
+    if 'The Astral Minstrel' in s:
+        return 'Jethro Tull & Pink Floyd – The Astral Minstrel'
+    if 'Psychedelic Latin Rock Journey' in s:
+        return 'Pink Floyd & Santana – Psychedelic Latin Rock Journey'
+    if 'Fillmore West 1971' in s:
+        return 'Santana & Aretha Franklin – Live at Fillmore West 1971'
+    if 'The Lost Psychedelic Tape' in s:
+        return 'Santana & Hendrix – The Lost Psychedelic Tape'
+    if 'Woodstock Witchfire' in s:
+        return "Santana – Woodstock Witchfire '69"
+    if 'THE MAP WRITTEN IN SALT' in s or 'The Map Written in Salt' in s:
+        return 'Pale Mechanism – The Map Written in Salt'
+    if 'سألوني الناس' in s or 'Saalouny El Nass' in s:
+        return 'Fairuz - Saalouny El Nass'
     
     # General patterns
     s = re.sub(r'\[Full Album\]', '', s, flags=re.I)
@@ -224,8 +268,10 @@ def process_album(src_file, target_dir, args):
 
         # Step 2: Query YouTube
         raw_clean = re.sub(r'\.(m4a|mp3|flac|wav|aac)$', '', raw_fn, flags=re.I).strip()
-        print(f"  Step 2: Querying YouTube for '{raw_clean}'...")
-        cmd_yt = [YT_DLP, f"ytsearch1:{raw_clean}", "-j", "--skip-download"]
+        search_q = re.sub(r'[^\w\s\-\–]', ' ', raw_clean)
+        search_q = re.sub(r'\s+', ' ', search_q).strip()
+        print(f"  Step 2: Querying YouTube for '{search_q}'...")
+        cmd_yt = [YT_DLP, f"ytsearch1:{search_q}", "-j", "--skip-download"]
         res_yt = subprocess.run(cmd_yt, capture_output=True, text=True)
         yt_data = {}
         if res_yt.returncode == 0 and res_yt.stdout.strip():
@@ -450,6 +496,10 @@ def main():
     print(f"==================================================")
 
     for idx, f in enumerate(files, 1):
+        if bool(f.stat().st_flags & 0x40000000):
+            print(f"\n[{idx}/{len(files)}] Skipping cloud-only file: {f.name}")
+            print(f"  -> File is marked dataless in Google Drive. It will be processed once materialized locally.")
+            continue
         try:
             process_album(str(f), str(base_dir), args)
         except Exception as e:
