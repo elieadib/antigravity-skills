@@ -60,7 +60,7 @@ YT_DLP = find_executable("yt-dlp")
 
 def clean_album_name(raw_name):
     """Strips YouTube video fluff, years, and marketing text to extract clean album title."""
-    s = re.sub(r'\.(m4a|mp3|flac|wav|aac)$', '', raw_name, flags=re.I)
+    s = re.sub(r'\.(m4a|mp3|flac|wav|aac|mp4)$', '', raw_name, flags=re.I)
     
     # Specific known overrides
     if 'Velvet Static' in s and 'Pacific Blondes' in s:
@@ -145,6 +145,12 @@ def clean_album_name(raw_name):
         return 'Pale Mechanism – The Map Written in Salt'
     if 'سألوني الناس' in s or 'Saalouny El Nass' in s:
         return 'Fairuz - Saalouny El Nass'
+    if 'B.B. King' in s and 'Santana' in s:
+        return 'B.B. King, Santana, Gary Moore & Eric Clapton – Midnight Blues Guitar Legends'
+    if 'DIO' in s and 'Magica II' in s:
+        return 'DIO - Magica II'
+    if 'Pink Floyd' in s and 'Mark Knopfler' in s and 'Lost Acoustic' in s:
+        return 'Pink Floyd & Mark Knopfler – Lost Acoustic Psychedelic Rock Journey'
     
     # General patterns
     s = re.sub(r'\[Full Album\]', '', s, flags=re.I)
@@ -251,7 +257,7 @@ def process_album(src_file, target_dir, args):
 
     work_dir = Path("/tmp") / f"curation_{abs(hash(sim_name)) % 100000}"
     work_dir.mkdir(parents=True, exist_ok=True)
-    local_audio = work_dir / "audio.m4a"
+    local_audio = work_dir / f"audio{Path(src_file).suffix.lower()}"
 
     try:
         # Step 1: Copy to local fast storage
@@ -482,7 +488,7 @@ def main():
         files = [target]
         base_dir = target.parent
     elif target.is_dir():
-        files = sorted([p for p in target.iterdir() if p.suffix.lower() in ['.m4a', '.mp3', '.flac']])
+        files = sorted([p for p in target.iterdir() if p.suffix.lower() in ['.m4a', '.mp3', '.flac', '.mp4']])
         base_dir = target
     else:
         sys.exit(f"Error: Target path does not exist: {target}")
