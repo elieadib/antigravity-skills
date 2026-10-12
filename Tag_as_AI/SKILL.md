@@ -14,6 +14,9 @@ description: >-
 
 Automated music tagging agent and utility that standardizes audio metadata across AI-generated music libraries (e.g., Suno, Udio, custom AI audio models). It sets or prefixes Genre tags, adds optional AI provenance/grouping markers, and strictly preserves existing album cover artwork and track metadata.
 
+> [!IMPORTANT]
+> **Strict Folder Restriction**: `Tag_as_AI` is strictly and exclusively reserved for the AI music directory `G:\AI_MUsic`. Never run `Tag_as_AI` on general music libraries or intake staging folders such as `G:\mp3-RawG`.
+
 ## Core Capabilities
 
 1. **Targeted AI Genre Assignment**:

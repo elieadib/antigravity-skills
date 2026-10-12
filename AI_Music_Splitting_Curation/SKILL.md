@@ -31,10 +31,10 @@ An automated audio curation workflow and standalone utility that transforms full
    - Detects vinyl/album sleeve mockups or horizontal banners and crops them into a pristine **1:1 square artwork** (`<Album Name>.png`).
 5. **Sample-Accurate Silence Detection Boundary Refinement**:
    - Analyzes a $\pm 10\text{s}$ window around track transitions using FFmpeg's `silencedetect` ($-20\text{ dB}$, minimum duration $0.2\text{s}$) to place cuts at the exact silence midpoint.
-6. **128 kb/s MP3 Transcoding & ID3 Tagging**:
+6. **128 kb/s MP3 Transcoding & Tag_as_AI ID3 Tagging**:
    - Encodes each track to constant-bitrate MP3 at **128 kb/s** (44.1 kHz stereo) with `libmp3lame`.
    - Embeds the square artwork directly into ID3 tags (`attached_pic` front cover).
-   - Writes complete tags: `Title`, `Artist`, `Album`, and `Track Number` (`x/Total`).
+   - Integrates **`Tag_as_AI`**: Writes complete tags (`Title`, `Artist`, `Album`, `Track Number`) and standardizes `Genre` to **`AI_Rock`** (or custom `--genre`).
 7. **Directory Organization & Safe Cleanup**:
    - Moves all converted tracks (`<Album Name>_Track01.mp3`, etc.) and `<Album Name>.png` into a dedicated folder.
    - Cleans up intermediate sliced files, full-album `.mp3` files, and removes the source full-album file once verified.
@@ -78,6 +78,7 @@ python3 "$HOME/Library/CloudStorage/GoogleDrive-elieadib@gmail.com/My Drive/Anti
 | :--- | :--- | :--- | :--- |
 | `path` | | `.` | Target music folder containing audio files or individual audio file. |
 | `--bitrate` | `-b` | `128k` | Target MP3 encoding bitrate (e.g. `128k`, `192k`, `320k`). |
+| `--genre` | `-g` | `AI_Rock` | Target AI Genre tag assigned via Tag_as_AI (e.g. `AI_Rock`, `AI_Jazz`, `AI_Music`). |
 | `--sample-rate` | `-r` | `44100` | Target audio sample rate in Hz. |
 | `--keep-source` | | `False` | Preserve original source audio file after verified track generation. |
 | `--dry-run` | `-d` | `False` | Preview actions, YouTube matches, and split points without modifying files. |

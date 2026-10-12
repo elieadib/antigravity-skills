@@ -11,6 +11,13 @@ import argparse
 import subprocess
 import shutil
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 SUPPORTED_EXTENSIONS = ('.mp4', '.mov', '.m4v')
 
 def is_faststart_enabled(filepath):

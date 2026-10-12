@@ -30,8 +30,8 @@ def main():
     parser.add_argument("--letterbox", action="store_true", help="Apply 2.39:1 anamorphic letterbox matte bars")
     parser.add_argument("--border", type=int, default=30, help="White border thickness in pixels (default: 30)")
     parser.add_argument("--margin", type=int, default=80, help="Margin around media box leaving blurred background (default: 80)")
-    parser.add_argument("--shuffle", action="store_true", default=True, help="Randomly shuffle photos and videos throughout the slideshow (default: True)")
-    parser.add_argument("--no-shuffle", dest="shuffle", action="store_false", help="Sort photos and videos chronologically by date")
+    parser.add_argument("--shuffle", action="store_true", default=False, help="Randomly shuffle photos and videos throughout the slideshow (default: False)")
+    parser.add_argument("--no-shuffle", dest="shuffle", action="store_false", help="Sort photos and videos chronologically by date (default: True)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducible shuffling (default: None for fresh random selection)")
     parser.add_argument("--trim-videos", type=float, default=None, help="Trim videos to max N seconds (default: untrimmed)")
     parser.add_argument("--pilot", action="store_true", help="Render a fast 5-shot preview pilot movie")
@@ -39,7 +39,7 @@ def main():
     parser.add_argument("--pilot-offset", type=int, default=0, help="Offset index for pilot shot selection to test different photos (default: 0)")
     parser.add_argument("--captions", default=None, help="JSON string or path to JSON file mapping filename -> caption")
     parser.add_argument("--shot-order", default=None, help="Comma-separated filenames or path to JSON/text file with shot sequence")
-    parser.add_argument("--photo-dur", type=float, default=None, help="Hold duration for photos in seconds (e.g. 8.0)")
+    parser.add_argument("--photo-dur", type=float, default=3.0, help="Hold duration for photos in seconds (default: 3.0s)")
     parser.add_argument("--music", nargs="*", default=None, help="Audio file(s) to mix as background soundtrack with automatic crossfades")
     parser.add_argument("--clear-cache", action="store_true", help="Clear temporary render cache before processing")
     parser.add_argument("--temp-dir", default=None, help="Custom temporary cache directory")
@@ -134,6 +134,33 @@ def main():
         custom_order=custom_order,
         photo_dur=args.photo_dur
     )
+
+    timeline_file = os.path.join(temp_dir, "timeline.json")
+    if not args.pilot and not custom_order and not args.clear_cache and os.path.exists(timeline_file):
+        try:
+            with open(timeline_file, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+                if isinstance(saved, list) and len(saved) > 2:
+                    timeline = saved
+                    print(f"Resuming with saved timeline ({len(timeline)} shots) from: {timeline_file}")
+                    if captions_map:
+                        for item in timeline:
+                            c = captions_map.get(item.get("filename"), captions_map.get(os.path.basename(item.get("path", "")), ""))
+                            if not c:
+                                for k, v in captions_map.items():
+                                    if k.lower() == item.get("filename", "").lower() or os.path.splitext(k.lower())[0] == os.path.splitext(item.get("filename", "").lower())[0]:
+                                        c = v
+                                        break
+                            item["caption"] = c
+        except Exception:
+            pass
+    elif not args.pilot:
+        os.makedirs(temp_dir, exist_ok=True)
+        try:
+            with open(timeline_file, "w", encoding="utf-8") as f:
+                json.dump(timeline, f, indent=2)
+        except Exception:
+            pass
 
     if args.pilot:
         print(f"Creating Pilot Preview playlist ({args.pilot_shots} shots, shuffle={args.shuffle})...")

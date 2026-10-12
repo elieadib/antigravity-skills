@@ -7,6 +7,7 @@ pronounced alternating 2.5D Ken Burns motion, xfade transitions, acrossfade audi
 import os
 import sys
 import json
+import time
 import subprocess
 import compositor
 
@@ -392,16 +393,27 @@ def stitch_batch(clips, transitions, out_file, encoder, enc_args, apply_grade=Fa
 
     inputs = []
     for c in clips:
-        inputs.extend(["-i", c])
+        inputs.extend(["-noautorotate", "-i", c])
 
     durations = []
     for c in clips:
-        res = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", c],
-            capture_output=True, text=True
-        )
-        data = json.loads(res.stdout)
-        durations.append(float(data["format"]["duration"]))
+        dur = 0.0
+        for attempt in range(5):
+            try:
+                res = subprocess.run(
+                    ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", c],
+                    capture_output=True, text=True
+                )
+                data = json.loads(res.stdout)
+                dur = float(data.get("format", {}).get("duration", 0))
+                if dur > 0:
+                    break
+            except Exception:
+                pass
+            time.sleep(0.5)
+        if dur <= 0:
+            dur = probe_file_duration(c)
+        durations.append(max(0.5, dur))
 
     v_nodes = ["[0:v]"]
     a_nodes = ["[0:a]"]
@@ -456,19 +468,25 @@ def stitch_batch(clips, transitions, out_file, encoder, enc_args, apply_grade=Fa
         "-map", map_v, "-map", final_a,
         "-c:v", encoder, *enc_args,
         "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
-        out_file
+        "-c:a", "aac", "-b:a", "192k"
     ]
+    cmd.append(out_file)
     run_cmd(cmd, f"Stitching batch to {out_file}")
 
 def probe_file_duration(path):
-    """Probes media duration in seconds using ffprobe."""
-    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", path]
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True)
-        return float(json.loads(res.stdout)["format"]["duration"])
-    except Exception:
-        return 0.0
+    """Probes media duration in seconds using ffprobe with retries."""
+    for attempt in range(5):
+        try:
+            cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", path]
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            d = json.loads(res.stdout)
+            dur = float(d.get("format", {}).get("duration", 0))
+            if dur > 0:
+                return dur
+        except Exception:
+            pass
+        time.sleep(0.5)
+    return 0.0
 
 def mix_soundtrack(music_files, output_audio, total_duration, orig_video=None, crossfade_dur=8.0):
     """
@@ -522,6 +540,100 @@ def mix_soundtrack(music_files, output_audio, total_duration, orig_video=None, c
     run_cmd(cmd, "Mixing multi-track soundtrack")
     return output_audio
 
+def render_single_shot(shot, out_clip, temp_dir, cache_dir, width, height, fps,
+                       encoder, enc_args, title_center, title_date, border_px, letterbox_bars, margin):
+    """Renders a single shot clip if not already valid in cache."""
+    s_id = shot["shot_id"]
+    s_type = shot["type"]
+
+    if s_type == "title_slide":
+        meta_file = os.path.join(temp_dir, "title_meta.json")
+        title_changed = True
+        if os.path.exists(meta_file):
+            try:
+                with open(meta_file, "r") as f:
+                    old_meta = json.load(f)
+                    if old_meta.get("title_center") == title_center and old_meta.get("title_date") == title_date:
+                        title_changed = False
+            except Exception:
+                pass
+        if title_changed:
+            try:
+                with open(meta_file, "w") as f:
+                    json.dump({"title_center": title_center, "title_date": title_date}, f)
+                if os.path.exists(out_clip):
+                    os.remove(out_clip)
+            except Exception:
+                pass
+
+    elif s_type == "photo":
+        meta_file = os.path.join(cache_dir, f"photo_meta_{s_id:03d}.json")
+        photo_caption = shot.get("caption", "")
+        photo_changed = True
+        if os.path.exists(meta_file):
+            try:
+                with open(meta_file, "r") as f:
+                    old_meta = json.load(f)
+                    if (old_meta.get("path") == shot.get("path") and
+                        old_meta.get("caption") == photo_caption and
+                        old_meta.get("duration") == shot.get("duration") and
+                        old_meta.get("motion") == shot.get("motion")):
+                        photo_changed = False
+            except Exception:
+                pass
+        if photo_changed:
+            try:
+                with open(meta_file, "w") as f:
+                    json.dump({
+                        "path": shot.get("path"),
+                        "caption": photo_caption,
+                        "duration": shot.get("duration"),
+                        "motion": shot.get("motion")
+                    }, f)
+                if os.path.exists(out_clip):
+                    os.remove(out_clip)
+            except Exception:
+                pass
+
+    elif s_type == "video":
+        meta_file = os.path.join(cache_dir, f"video_meta_{s_id:03d}.json")
+        video_caption = shot.get("caption", "")
+        video_changed = True
+        if os.path.exists(meta_file):
+            try:
+                with open(meta_file, "r") as f:
+                    old_meta = json.load(f)
+                    if (old_meta.get("path") == shot.get("path") and
+                        old_meta.get("caption") == video_caption and
+                        old_meta.get("duration") == shot.get("duration")):
+                        video_changed = False
+            except Exception:
+                pass
+        if video_changed:
+            try:
+                with open(meta_file, "w") as f:
+                    json.dump({
+                        "path": shot.get("path"),
+                        "caption": video_caption,
+                        "duration": shot.get("duration")
+                    }, f)
+                if os.path.exists(out_clip):
+                    os.remove(out_clip)
+            except Exception:
+                pass
+
+    if not is_valid_clip(out_clip):
+        if s_type == "black_intro" or s_type == "black_outro":
+            render_black_clip(shot, out_clip, width, height, fps, encoder, enc_args)
+        elif s_type == "title_slide":
+            render_title_clip(shot, out_clip, cache_dir, width, height, fps, encoder, enc_args, title_center, title_date, border_px, letterbox_bars, margin=margin)
+        elif s_type == "photo":
+            render_photo_clip(shot, out_clip, cache_dir, width, height, fps, encoder, enc_args, border_px, 35, letterbox_bars, margin=margin)
+        elif s_type == "video":
+            render_video_clip(shot, out_clip, width, height, fps, encoder, enc_args, border_px, margin=margin)
+    else:
+        print(f"  -> Reusing cached clip: {os.path.basename(out_clip)}")
+
 def render_movie(timeline, output_file, temp_dir, width=3840, height=2160, fps=24,
                  border_px=30, letterbox_bars=0, title_center="Vacation 2026", title_date="", margin=80,
                  music_tracks=None):
@@ -534,107 +646,151 @@ def render_movie(timeline, output_file, temp_dir, width=3840, height=2160, fps=2
     os.makedirs(clips_dir, exist_ok=True)
     os.makedirs(cache_dir, exist_ok=True)
 
-    rendered_clips = []
-    transitions = []
     total = len(timeline)
 
-    print(f"Rendering {total} shots with {border_px}px white border and dynamic Ken Burns...")
-    for idx, shot in enumerate(timeline):
-        s_id = shot["shot_id"]
-        s_type = shot["type"]
-        out_clip = os.path.join(clips_dir, f"clip_{s_id:03d}.mp4")
+    if total <= 12:
+        print(f"Rendering {total} shots with {border_px}px white border and dynamic Ken Burns...")
+        rendered_clips = []
+        transitions = []
+        for idx, shot in enumerate(timeline):
+            s_id = shot["shot_id"]
+            s_type = shot["type"]
+            out_clip = os.path.join(clips_dir, f"clip_{s_id:03d}.mp4")
+            print(f"[{idx+1}/{total}] Shot #{s_id} ({s_type}, dur={shot.get('duration')}s): {shot.get('filename', 'solid')}")
+            render_single_shot(
+                shot, out_clip, temp_dir, cache_dir, width, height, fps,
+                encoder, enc_args, title_center, title_date, border_px, letterbox_bars, margin
+            )
+            rendered_clips.append(out_clip)
+            if idx < total - 1:
+                transitions.append(shot.get("transition", "fade"))
 
-        print(f"[{idx+1}/{total}] Shot #{s_id} ({s_type}, dur={shot.get('duration')}s): {shot.get('filename', 'solid')}")
-
-        if s_type == "title_slide":
-            meta_file = os.path.join(temp_dir, "title_meta.json")
-            title_changed = True
-            if os.path.exists(meta_file):
-                try:
-                    with open(meta_file, "r") as f:
-                        old_meta = json.load(f)
-                        if old_meta.get("title_center") == title_center and old_meta.get("title_date") == title_date:
-                            title_changed = False
-                except Exception:
-                    pass
-            if title_changed:
-                try:
-                    with open(meta_file, "w") as f:
-                        json.dump({"title_center": title_center, "title_date": title_date}, f)
-                    if os.path.exists(out_clip):
-                        os.remove(out_clip)
-                except Exception:
-                    pass
-
-        elif s_type == "photo":
-            meta_file = os.path.join(cache_dir, f"photo_meta_{s_id:03d}.json")
-            photo_caption = shot.get("caption", "")
-            photo_changed = True
-            if os.path.exists(meta_file):
-                try:
-                    with open(meta_file, "r") as f:
-                        old_meta = json.load(f)
-                        if (old_meta.get("path") == shot.get("path") and
-                            old_meta.get("caption") == photo_caption and
-                            old_meta.get("duration") == shot.get("duration") and
-                            old_meta.get("motion") == shot.get("motion")):
-                            photo_changed = False
-                except Exception:
-                    pass
-            if photo_changed:
-                try:
-                    with open(meta_file, "w") as f:
-                        json.dump({
-                            "path": shot.get("path"),
-                            "caption": photo_caption,
-                            "duration": shot.get("duration"),
-                            "motion": shot.get("motion")
-                        }, f)
-                    if os.path.exists(out_clip):
-                        os.remove(out_clip)
-                except Exception:
-                    pass
-
-        if not is_valid_clip(out_clip):
-            if s_type == "black_intro" or s_type == "black_outro":
-                render_black_clip(shot, out_clip, width, height, fps, encoder, enc_args)
-            elif s_type == "title_slide":
-                render_title_clip(shot, out_clip, cache_dir, width, height, fps, encoder, enc_args, title_center, title_date, border_px, letterbox_bars, margin=margin)
-            elif s_type == "photo":
-                render_photo_clip(shot, out_clip, cache_dir, width, height, fps, encoder, enc_args, border_px, 35, letterbox_bars, margin=margin)
-            elif s_type == "video":
-                render_video_clip(shot, out_clip, width, height, fps, encoder, enc_args, border_px, margin=margin)
-        else:
-            print(f"  -> Reusing cached clip: {os.path.basename(out_clip)}")
-
-        rendered_clips.append(out_clip)
-        if idx < total - 1:
-            transitions.append(shot.get("transition", "fade"))
-
-    if len(rendered_clips) <= 12:
         print("\nStitching clips into final movie...")
         stitch_batch(rendered_clips, transitions, output_file, encoder, enc_args, apply_grade=True)
     else:
-        print("\nStitching in chunks...")
         chunk_size = 10
-        chunk_files = []
-        chunk_transitions = []
+        num_chunks = (total + chunk_size - 1) // chunk_size
+        batch_size = 6
+        num_parts = (num_chunks + batch_size - 1) // batch_size
+        expected_parts = [os.path.join(temp_dir, f"part_{p:02d}.mp4") for p in range(num_parts)]
+        if all(is_valid_clip(p) and os.path.getsize(p) > 50000000 for p in expected_parts):
+            print(f"All {num_parts} pre-rendered hierarchical parts exist! Skipping chunk loop and assembling final master output...")
+            part_files = expected_parts
+            part_transitions = []
+            for b_idx in range(0, num_chunks, batch_size):
+                b_count = min(batch_size, num_chunks - b_idx)
+                if b_idx + b_count < num_chunks:
+                    part_end_shot = min((b_idx + b_count) * chunk_size, total) - 1
+                    part_transitions.append(timeline[part_end_shot].get("transition", "fade"))
 
-        for i in range(0, len(rendered_clips), chunk_size):
-            c_clips = rendered_clips[i:i+chunk_size]
-            c_trans = transitions[i:i+chunk_size-1]
-            c_out = os.path.join(temp_dir, f"chunk_{i//chunk_size:02d}.mp4")
-            print(f"Stitching Chunk {i//chunk_size + 1}/{(len(rendered_clips)+chunk_size-1)//chunk_size} ({len(c_clips)} clips)...")
-            if is_valid_clip(c_out) and os.path.getsize(c_out) > 1000000:
-                print(f"  -> Reusing existing chunk: {os.path.basename(c_out)}")
-            else:
+            print("\nStitching parts into final master output with film grade...")
+            stitch_batch(part_files, part_transitions, output_file, encoder, enc_args, apply_grade=True)
+            if is_valid_clip(output_file) and os.path.getsize(output_file) > 100000000:
+                print("Master output successfully created! Cleaning up intermediate part files...")
+                for pf in part_files:
+                    try:
+                        if os.path.exists(pf):
+                            os.remove(pf)
+                    except Exception:
+                        pass
+        else:
+            print(f"Rendering {total} shots across {num_chunks} chunks (stream mode to preserve disk space)...")
+            chunk_files = []
+            chunk_transitions = []
+
+            for c_idx in range(num_chunks):
+                start_i = c_idx * chunk_size
+                end_i = min(start_i + chunk_size, total)
+                c_out = os.path.join(temp_dir, f"chunk_{c_idx:02d}.mp4")
+
+                if is_valid_clip(c_out) and os.path.getsize(c_out) > 1000000:
+                    print(f"[{c_idx+1}/{num_chunks}] Reusing existing chunk: {os.path.basename(c_out)}")
+                    chunk_files.append(c_out)
+                    if end_i < total:
+                        chunk_transitions.append(timeline[end_i - 1].get("transition", "fade"))
+                    continue
+
+                print(f"\n=======================================================")
+                print(f"  Rendering Chunk {c_idx+1}/{num_chunks} (shots {start_i+1} to {end_i})")
+                print(f"=======================================================")
+                c_clips = []
+                c_trans = []
+
+                for idx in range(start_i, end_i):
+                    shot = timeline[idx]
+                    s_id = shot["shot_id"]
+                    s_type = shot["type"]
+                    out_clip = os.path.join(clips_dir, f"clip_{s_id:03d}.mp4")
+                    print(f"[{idx+1}/{total}] Shot #{s_id} ({s_type}, dur={shot.get('duration')}s): {shot.get('filename', 'solid')}")
+                    render_single_shot(
+                        shot, out_clip, temp_dir, cache_dir, width, height, fps,
+                        encoder, enc_args, title_center, title_date, border_px, letterbox_bars, margin
+                    )
+                    c_clips.append(out_clip)
+                    if idx < end_i - 1:
+                        c_trans.append(shot.get("transition", "fade"))
+
+                print(f"Stitching Chunk {c_idx+1}/{num_chunks} ({len(c_clips)} clips)...")
                 stitch_batch(c_clips, c_trans, c_out, encoder, enc_args, apply_grade=False)
-            chunk_files.append(c_out)
-            if i + chunk_size < len(rendered_clips):
-                chunk_transitions.append(transitions[i+chunk_size-1])
+                chunk_files.append(c_out)
 
-        print("\nStitching chunks into master output with film grade...")
-        stitch_batch(chunk_files, chunk_transitions, output_file, encoder, enc_args, apply_grade=True)
+                # Immediately delete individual clip files for this chunk to conserve disk space
+                for clip_p in c_clips:
+                    try:
+                        if os.path.exists(clip_p):
+                            os.remove(clip_p)
+                    except Exception:
+                        pass
+
+                if end_i < total:
+                    chunk_transitions.append(timeline[end_i - 1].get("transition", "fade"))
+
+            if len(chunk_files) <= 6:
+                print("\nStitching chunks into master output with film grade...")
+                stitch_batch(chunk_files, chunk_transitions, output_file, encoder, enc_args, apply_grade=True)
+                if is_valid_clip(output_file) and os.path.getsize(output_file) > 100000000:
+                    print("Master output successfully created! Cleaning up intermediate chunk files...")
+                    for cf in chunk_files:
+                        try:
+                            if os.path.exists(cf):
+                                os.remove(cf)
+                        except Exception:
+                            pass
+            else:
+                print(f"\nHierarchical stitch of {len(chunk_files)} chunks in 6-chunk batches...")
+                batch_size = 6
+                part_files = []
+                part_transitions = []
+                for b_idx in range(0, len(chunk_files), batch_size):
+                    b_chunks = chunk_files[b_idx:b_idx+batch_size]
+                    b_trans = chunk_transitions[b_idx:b_idx+len(b_chunks)-1]
+                    part_out = os.path.join(temp_dir, f"part_{b_idx//batch_size:02d}.mp4")
+                    print(f"\nStitching Part {b_idx//batch_size + 1}/{(len(chunk_files)+batch_size-1)//batch_size} ({len(b_chunks)} chunks)...")
+                    if is_valid_clip(part_out) and os.path.getsize(part_out) > 50000000:
+                        print(f"  -> Reusing existing part: {os.path.basename(part_out)}")
+                    else:
+                        stitch_batch(b_chunks, b_trans, part_out, encoder, enc_args, apply_grade=False)
+                    part_files.append(part_out)
+                    # Cleanup source chunks for this part to immediately free disk space
+                    for sc in b_chunks:
+                        try:
+                            if os.path.exists(sc):
+                                os.remove(sc)
+                        except Exception:
+                            pass
+                    if b_idx + len(b_chunks) < len(chunk_files):
+                        part_transitions.append(chunk_transitions[b_idx + len(b_chunks) - 1])
+
+                print("\nStitching parts into final master output with film grade...")
+                stitch_batch(part_files, part_transitions, output_file, encoder, enc_args, apply_grade=True)
+                if is_valid_clip(output_file) and os.path.getsize(output_file) > 100000000:
+                    print("Master output successfully created! Cleaning up intermediate part files...")
+                    for pf in part_files:
+                        try:
+                            if os.path.exists(pf):
+                                os.remove(pf)
+                        except Exception:
+                            pass
 
     if music_tracks:
         print("\nMixing and crossfading background soundtrack...")

@@ -20,6 +20,7 @@ import json
 import re
 import shutil
 import time
+import tempfile
 from pathlib import Path
 
 # Ensure UTF-8 output
@@ -49,6 +50,10 @@ def find_executable(name, extra_paths=None):
             os.path.expanduser(rf"~\miniconda3\Scripts\{name}.exe"),
             os.path.expanduser(rf"~\anaconda3\Scripts\{name}.exe"),
         ])
+        winget_pkg_dir = Path(os.path.expanduser(r"~\AppData\Local\Microsoft\WinGet\Packages"))
+        if winget_pkg_dir.is_dir():
+            for p in winget_pkg_dir.glob(rf"**/{name}.exe"):
+                candidates.append(str(p))
     for c in candidates:
         if os.path.isfile(c) and os.access(c, os.X_OK):
             return c
@@ -151,6 +156,22 @@ def clean_album_name(raw_name):
         return 'DIO - Magica II'
     if 'Pink Floyd' in s and 'Mark Knopfler' in s and 'Lost Acoustic' in s:
         return 'Pink Floyd & Mark Knopfler – Lost Acoustic Psychedelic Rock Journey'
+    if 'Lunar 237' in s:
+        return 'Lunar 237'
+    if 'The Eden Directive' in s:
+        return 'The Eden Directive'
+    if 'THE SILENT OBELISK' in s or 'The Silent Obelisk' in s or 'Where Love Remains' in s:
+        return 'The Silent Obelisk (Where Love Remains Part II)'
+    if 'British Heavy Rock Legends' in s:
+        return 'British Heavy Rock Legends 1972'
+    if 'Mushroom Wind Band' in s:
+        return 'Mushroom Wind Band - Stars'
+    if 'Strange World' in s and 'Psychedelic Blondes' in s:
+        return 'The Psychedelic Blondes - Strange World'
+    if 'THREE CHASSIS' in s or 'Electric Love' in s:
+        return 'THREE CHASSIS - Electric Love'
+    if 'Top 10 Blues Rock Songs' in s:
+        return 'Rhett Veylor Blues - Top 10 Blues Rock Songs Of All Time'
     
     # General patterns
     s = re.sub(r'\[Full Album\]', '', s, flags=re.I)
@@ -247,6 +268,7 @@ def smart_crop_square(orig_img_path, dest_img_path):
 def process_album(src_file, target_dir, args):
     raw_fn = os.path.basename(src_file)
     sim_name = clean_album_name(raw_fn)
+    safe_name = re.sub(r'[<>:"/\\|?*]', '_', sim_name).strip()
     print(f"\n==================================================")
     print(f"Processing: {sim_name}")
     print(f"  Source File: {raw_fn}")
@@ -255,7 +277,7 @@ def process_album(src_file, target_dir, args):
         print("  [DRY-RUN] Would process album, search YouTube, and split tracks.")
         return True
 
-    work_dir = Path("/tmp") / f"curation_{abs(hash(sim_name)) % 100000}"
+    work_dir = Path(tempfile.gettempdir()) / f"curation_{abs(hash(sim_name)) % 100000}_{int(time.time())}"
     work_dir.mkdir(parents=True, exist_ok=True)
     local_audio = work_dir / f"audio{Path(src_file).suffix.lower()}"
 
@@ -362,7 +384,7 @@ def process_album(src_file, target_dir, args):
                 t["title"] = f"Track {len(tracks)}"
 
         # Step 4: Download and crop cover art
-        cover_png = work_dir / f"{sim_name}.png"
+        cover_png = work_dir / f"{safe_name}.png"
         if video_id:
             thumb_base = work_dir / "thumb"
             subprocess.run([
@@ -417,7 +439,7 @@ def process_album(src_file, target_dir, args):
             t_num = i + 1
             st, en = split_points[i], split_points[i+1]
             title = tracks[i]["title"]
-            mp3_fn = f"{sim_name}_Track{t_num:02d}.mp3"
+            mp3_fn = f"{safe_name}_Track{t_num:02d}.mp3"
             mp3_path = work_dir / mp3_fn
 
             cmd_enc = [
@@ -435,6 +457,7 @@ def process_album(src_file, target_dir, args):
                 "-metadata", f"title={title}",
                 "-metadata", f"artist={artist}",
                 "-metadata", f"album={sim_name}",
+                "-metadata", f"genre={getattr(args, 'genre', 'AI_Rock')}",
                 "-metadata", f"track={t_num}/{total_t}",
                 str(mp3_path)
             ]
@@ -444,12 +467,29 @@ def process_album(src_file, target_dir, args):
             print(f"    Track {t_num:02d}/{total_t:02d}: {title[:35]:35s} | {sz_mb:5.2f} MB")
 
         # Step 7: Move to Destination Directory
-        dest_dir = Path(target_dir) / sim_name
+        dest_dir = Path(target_dir) / safe_name
         dest_dir.mkdir(parents=True, exist_ok=True)
         print(f"  Step 6: Moving assets to {dest_dir}...")
         for mp3_p, _, _ in created_mp3s:
             shutil.move(str(mp3_p), str(dest_dir / mp3_p.name))
-        shutil.copyfile(str(cover_png), str(dest_dir / f"{sim_name}.png"))
+        shutil.copyfile(str(cover_png), str(dest_dir / f"{safe_name}.png"))
+
+        # Step 7 (Tag_as_AI Integration): Ensure ID3 TCON Genre is set via Tag_as_AI
+        target_genre = getattr(args, "genre", "AI_Rock")
+        print(f"  Step 7: Applying Tag_as_AI genre metadata ('{target_genre}')...")
+        try:
+            from mutagen.mp3 import MP3
+            from mutagen.id3 import TCON
+            for mp3_f in dest_dir.glob("*.mp3"):
+                audio = MP3(str(mp3_f))
+                if audio.tags:
+                    audio.tags.delall("TCON")
+                    audio.tags.add(TCON(encoding=3, text=[target_genre]))
+                    audio.save(v2_version=3)
+        except Exception:
+            tag_script = Path(__file__).resolve().parent.parent.parent / "Tag_as_AI" / "scripts" / "tag_as_ai.py"
+            if tag_script.is_file():
+                subprocess.run([sys.executable, str(tag_script), str(dest_dir), "--genre", target_genre], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # Step 8: Clean up source files
         if not args.keep_source:
@@ -460,6 +500,25 @@ def process_album(src_file, target_dir, args):
                 cand_p = Path(target_dir) / cand
                 if cand_p.exists():
                     cand_p.unlink()
+
+        # Step 9: Update batch report if present
+        report_file = Path(target_dir) / "batch_report.json"
+        if report_file.exists():
+            try:
+                with open(report_file, "r", encoding="utf-8") as rf:
+                    report_data = json.load(rf)
+                report_data.append({
+                    "album": sim_name,
+                    "raw_file": raw_fn,
+                    "artist": artist,
+                    "tracks": len(tracks),
+                    "duration_seconds": total_dur,
+                    "status": "COMPLETED"
+                })
+                with open(report_file, "w", encoding="utf-8") as wf:
+                    json.dump(report_data, wf, indent=2)
+            except Exception as e:
+                print(f"    Warning: Could not update batch_report.json: {e}")
 
         print(f"  SUCCESS: {sim_name} completed successfully!\n")
         return True
@@ -474,6 +533,7 @@ def main():
     parser.add_argument("path", nargs="?", default=".", help="Target folder containing audio files or individual file")
     parser.add_argument("-b", "--bitrate", default="128k", help="MP3 audio bitrate (default: 128k)")
     parser.add_argument("-r", "--sample-rate", type=int, default=44100, help="Audio sample rate (default: 44100)")
+    parser.add_argument("-g", "--genre", default="AI_Rock", help="AI Genre tag to assign via Tag_as_AI (default: 'AI_Rock')")
     parser.add_argument("--keep-source", action="store_true", help="Keep source audio files after processing")
     parser.add_argument("-d", "--dry-run", action="store_true", help="Preview proposed actions without modifying files")
     args = parser.parse_args()
@@ -488,7 +548,7 @@ def main():
         files = [target]
         base_dir = target.parent
     elif target.is_dir():
-        files = sorted([p for p in target.iterdir() if p.suffix.lower() in ['.m4a', '.mp3', '.flac', '.mp4']])
+        files = sorted([p for p in target.iterdir() if p.is_file() and p.suffix.lower() in ['.m4a', '.mp3', '.flac', '.mp4']])
         base_dir = target
     else:
         sys.exit(f"Error: Target path does not exist: {target}")
@@ -502,7 +562,8 @@ def main():
     print(f"==================================================")
 
     for idx, f in enumerate(files, 1):
-        if bool(f.stat().st_flags & 0x40000000):
+        stat_res = f.stat()
+        if hasattr(stat_res, "st_flags") and bool(stat_res.st_flags & 0x40000000):
             print(f"\n[{idx}/{len(files)}] Skipping cloud-only file: {f.name}")
             print(f"  -> File is marked dataless in Google Drive. It will be processed once materialized locally.")
             continue

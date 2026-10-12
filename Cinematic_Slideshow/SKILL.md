@@ -4,10 +4,11 @@ description: >-
   Transforms any collection of vacation photos and videos into a high-end, cinematic 4K UHD slideshow video.
   Features dynamic 2.5D Ken Burns effects (alternating zoom/pan directions), visible 30px white borders on photos
   and videos, dual-layer blurred matching backdrops leaving an 80px blurred background margin, custom title sequences
-  (centered title + bottom-right date), smooth transitions (cross-dissolves, light leaks, whip pans, film fades),
-  untrimmed full-duration video preservation, hardware-accelerated rendering (NVIDIA NVENC, Intel QSV, AMD AMF, Apple VideoToolbox, CPU fallback),
+  (top-left title + bottom-right date), smooth transitions (cross-dissolves, light leaks, whip pans, film fades),
+  3.0s photo display duration by default, untrimmed full-duration video preservation by default, chronological ordering
+  by metadata timestamps by default, hardware-accelerated rendering (NVIDIA NVENC, Intel QSV, AMD AMF, Apple VideoToolbox, CPU fallback),
   and unified Mediterranean filmic color grading. ALWAYS ask the user: 1) what folder the photos and videos are located in,
-  and 2) what text to add on the 1st Cover/title photo (Centered Event Text and bottom-right Date Text) before rendering.
+  and 2) what text to add on the 1st Cover/title photo (Top-Left Event Text and Bottom-Right Date Text) before rendering.
   Use whenever the user requests to create a slideshow, vacation video, photo montage, cinematic video from photos and videos,
   or compile travel media into a movie.
 ---
@@ -26,8 +27,8 @@ Designed to run seamlessly across all PCs (automatically selecting NVIDIA NVENC,
 Before initiating ANY slideshow processing or rendering (whether running a pilot preview or the full master slideshow), the agent **MUST ALWAYS ASK THE USER**:
 1. **Source Media Folder**: What folder path the photos and videos are located in. Never assume or auto-select a folder path without asking.
 2. **Cover / Title Photo Customization**:
-   - **Centered Event Text**: A title/phrase describing the event (e.g., *"Summer 2026 - 2 weeks in Crete"*, *"Tuscany Roadtrip 2026"*, *"Family Holidays in Spain"*).
-   - **Bottom-Right Date Text**: The date or date range of the event (e.g., *"Aug 2026"*, *"August 10 – 24, 2026"*, *"July 2026"*).
+   - **Top-Left Event Text**: A title/phrase describing the event (e.g., *"Summer 2026 - 2 weeks in Crete"*, *"10 Days in the Azores"*, *"Family Holidays in Spain"*).
+   - **Bottom-Right Date Text**: The date or date range of the event (e.g., *"May 2026"*, *"August 10 – 24, 2026"*, *"July 2026"*).
 
 **NEVER** guess, auto-generate, or infer folder paths, title text, or date text without explicitly asking the user and confirming their choice first!
 
@@ -36,7 +37,13 @@ Before initiating ANY slideshow processing or rendering (whether running a pilot
 ## Capabilities & Features
 
 - **Universal Multi-PC Hardware Acceleration**:
-  - Automatically probes available video encoders: **NVIDIA NVENC** (`h264_nvenc`), **Intel QuickSync** (`h264_qsv`), **AMD AMF** (`h264_amf`), or optimized CPU (`libx264`). Runs at maximum speed on any desktop or laptop without manual setup.
+  - Automatically probes available video encoders: **Apple VideoToolbox** (`h264_videotoolbox`), **NVIDIA NVENC** (`h264_nvenc`), **Intel QuickSync** (`h264_qsv`), **AMD AMF** (`h264_amf`), or optimized CPU (`libx264`). Runs at maximum speed on any desktop or laptop without manual setup.
+- **3.0-Second Photo Display Pacing**:
+  - By default, all photos display for **3.0 seconds** for engaging visual pacing.
+- **Full Untrimmed Video Preservation**:
+  - By default preserves 100% of original video recordings without arbitrary cutting.
+- **Strict Chronological Sequence**:
+  - By default, orders all photos and videos chronologically based on embedded EXIF and video metadata creation timestamps.
 - **Dynamic 2.5D Ken Burns Effects (Zoom-In & Zoom-Out Focus)**:
   - Continuous camera motion on 100% of still photographs, heavily favoring smooth zoom-in and zoom-out motions:
     `zoom_in_center`, `zoom_out_center`, `zoom_in_upper` (focusing on faces and subjects in upper third), `zoom_out_upper`,
@@ -52,8 +59,9 @@ Before initiating ANY slideshow processing or rendering (whether running a pilot
   - Opens with a 2.0-second pure black screen.
   - Smoothly dissolves into the title slide using `Cover.jpg` (or first photo) with slow push-in.
   - **t = 0.0s – 2.0s**: Displays the clean cover photo with 30px white border and slow push-in (no text visible).
-  - **t = 2.0s**: Centered Event Text begins typing character-by-character in the center.
-  - **t = 4.0s**: (2.0s after the 1st text starts) Bottom-right date text begins typing character-by-character.
+  - **t = 2.0s**: Event Title begins typing character-by-character at **Top-Left**.
+  - **t = 4.0s**: (2.0s after the 1st text starts) Date text begins typing character-by-character at **Bottom-Right**.
+  - **t > typing**: Both titles held with elegant drop shadow until the transition (default duration 9.0s).
   - **t > typing**: Both titles held with elegant drop shadow until the transition (default duration 9.0s).
 - **Untrimmed Video Support**:
   - By default preserves 100% of original video recordings without arbitrary cutting. Optional `--trim-videos N` flag available for fast highlight reels.
@@ -123,11 +131,13 @@ python "$HOME/.gemini/config/skills/Cinematic_Slideshow/scripts/slideshow_maker.
 | `--letterbox` | Flag | Off (16:9 full) | Enables 2.39:1 anamorphic letterbox matte bars |
 | `--border` | Int | `30` | White border thickness in pixels |
 | `--margin` | Int | `80` | Margin around media box leaving blurred background in pixels |
-| `--shuffle` | Flag | On (True) | Randomly shuffle photos and videos across the timeline |
-| `--no-shuffle` | Flag | Off | Arrange photos and videos chronologically by date |
+| `--photo-dur` | Float | `3.0` | Display duration for still photographs in seconds |
+| `--shuffle` | Flag | Off (False) | Randomly shuffle photos and videos across the timeline |
+| `--no-shuffle` | Flag | On (True) | Arrange photos and videos chronologically by metadata date |
 | `--seed` | Int | `None` | Optional random seed for reproducible shuffle sequences |
-| `--trim-videos` | Float | `None` (untrimmed) | Trims videos to maximum N seconds if set |
+| `--trim-videos` | Float | `None` (untrimmed) | Trims videos to maximum N seconds if set (default: untrimmed full length) |
 | `--pilot` | Flag | Off | Renders a fast 5-shot test preview |
+| `--captions` | String/File | `None` | JSON file or string mapping filenames to localized captions |
 | `--clear-cache` | Flag | Off | Clears intermediate render caches before rendering |
 
 ---

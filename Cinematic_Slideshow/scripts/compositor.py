@@ -12,24 +12,31 @@ import random
 import math
 from PIL import Image, ImageOps, ImageFilter, ImageDraw, ImageFont
 
-def get_font(font_name="georgiab.ttf", size=100):
-    """Safely retrieves a font across Windows, macOS, and Linux or falls back gracefully."""
+def get_font(font_name="FontdinerSwanky-Regular.ttf", size=100):
+    """Safely retrieves a font across macOS, Windows, and Linux with priority on Fontdiner Swanky."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    skill_root = os.path.dirname(script_dir)
     font_paths = [
-        # Windows
-        os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", font_name),
-        os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "arialbd.ttf"),
-        os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "arial.ttf"),
+        # Direct paths to Fontdiner Swanky
+        "/Users/edib/Library/Fonts/FontdinerSwanky-Regular.ttf",
+        os.path.join(skill_root, "resources", "FontdinerSwanky-Regular.ttf"),
+        os.path.join(script_dir, "resources", "FontdinerSwanky-Regular.ttf"),
+        font_name,
         # macOS
         "/System/Library/Fonts/Supplemental/Georgia Bold.ttf",
         "/System/Library/Fonts/Supplemental/Georgia.ttf",
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
         "/System/Library/Fonts/Supplemental/Arial.ttf",
+        # Windows
+        os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", font_name),
+        os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "arialbd.ttf"),
+        os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "arial.ttf"),
         # Linux
         "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     ]
     for fp in font_paths:
-        if os.path.exists(fp):
+        if fp and os.path.exists(fp):
             try:
                 return ImageFont.truetype(fp, size)
             except Exception:
@@ -141,67 +148,52 @@ def prepare_title_layers(cover_path, bg_output_path, fg_output_path,
 
     # Typography sizing proportional to photo height (50% bigger base)
     max_line_w = int(target_w * 0.88)
-    base_center_font_size = int(target_h * 0.0825)
-    date_font_size = int(target_h * 0.048)
+    base_center_font_size = int(target_h * 0.0825 * 1.5)
+    date_font_size = int(target_h * 0.048 * 1.5)
 
-    font_center = get_font("georgiab.ttf", base_center_font_size)
-    font_date = get_font("georgia.ttf", date_font_size)
+    font_center = get_font("FontdinerSwanky-Regular.ttf", base_center_font_size)
+    font_date = get_font("FontdinerSwanky-Regular.ttf", date_font_size)
 
     center_font_size = base_center_font_size
+    # If title slightly exceeds max_line_w, dynamically scale font to fit cleanly on one line
+    bb_full = font_center.getbbox(title_center) if title_center else (0, 0, 0, 0)
+    full_w = bb_full[2] - bb_full[0]
+    if full_w > max_line_w:
+        needed_scale = max_line_w / full_w
+        if needed_scale >= 0.65:
+            center_font_size = max(140, int(base_center_font_size * needed_scale * 0.96))
+            font_center = get_font("FontdinerSwanky-Regular.ttf", center_font_size)
+            date_font_size = max(90, int(date_font_size * needed_scale * 0.96))
+            font_date = get_font("FontdinerSwanky-Regular.ttf", date_font_size)
+
     lines_center = wrap_text_to_lines(title_center, font_center, max_line_w)
 
-    # If title is long and wraps into > 2 lines, search down to 0.065 * target_h to find
-    # a clean, balanced 2-line split so no orphan single words appear.
-    if len(lines_center) > 2 and title_center and " " in title_center:
-        words = title_center.split(" ")
-        for fs in range(base_center_font_size - 2, int(target_h * 0.065) - 1, -2):
-            f_test = get_font("georgiab.ttf", fs)
-            best_diff = float("inf")
-            best_pair = None
-            for i in range(1, len(words)):
-                l1 = " ".join(words[:i])
-                l2 = " ".join(words[i:])
-                w1 = f_test.getbbox(l1)[2] - f_test.getbbox(l1)[0]
-                w2 = f_test.getbbox(l2)[2] - f_test.getbbox(l2)[0]
-                if w1 <= max_line_w and w2 <= max_line_w:
-                    diff = abs(w1 - w2)
-                    if diff < best_diff:
-                        best_diff = diff
-                        best_pair = [l1, l2]
-            if best_pair:
-                center_font_size = fs
-                font_center = f_test
-                lines_center = best_pair
-                break
+    photo_x1 = (width - target_w) // 2
+    photo_y1 = (height - target_h) // 2
+    start_x = photo_x1 + int(target_w * 0.06)
+    start_y = photo_y1 + int(target_h * 0.07)
+
     line_positions = []
+    y_curr = start_y
     if lines_center:
-        line_heights = []
-        for line in lines_center:
-            bb = font_center.getbbox(line)
-            line_heights.append(bb[3] - bb[1])
-        line_spacing = int(center_font_size * 0.25)
-        total_text_h = sum(line_heights) + line_spacing * (len(lines_center) - 1)
-        y_curr = (height - total_text_h) // 2
         for idx, line in enumerate(lines_center):
             bb = font_center.getbbox(line)
             lw = bb[2] - bb[0]
-            lx = (width - lw) // 2
+            lh = bb[3] - bb[1]
             line_positions.append({
                 "text": line,
-                "x": lx,
+                "x": start_x,
                 "y": y_curr,
                 "w": lw,
-                "h": line_heights[idx]
+                "h": lh
             })
-            y_curr += line_heights[idx] + line_spacing
+            y_curr += lh + int(date_font_size * 0.35)
 
-    photo_x2 = (width + target_w) // 2
-    photo_y2 = (height + target_h) // 2
     if title_bottom_right:
         bbox_d = font_date.getbbox(title_bottom_right)
         tw_d, th_d = bbox_d[2] - bbox_d[0], bbox_d[3] - bbox_d[1]
-        rx = photo_x2 - tw_d - int(target_w * 0.04)
-        ry = photo_y2 - th_d - int(target_h * 0.05)
+        rx = photo_x1 + target_w - tw_d - int(target_w * 0.06)
+        ry = photo_y1 + target_h - th_d - int(target_h * 0.07)
     else:
         rx, ry, tw_d, th_d = 0, 0, 0, 0
 
@@ -211,8 +203,8 @@ def prepare_title_layers(cover_path, bg_output_path, fg_output_path,
         "center_font_size": center_font_size,
         "date_font_size": date_font_size,
         "line_positions": line_positions,
-        "x_c": line_positions[0]["x"] if line_positions else width // 2,
-        "y_c": line_positions[0]["y"] if line_positions else height // 2,
+        "x_c": line_positions[0]["x"] if line_positions else start_x,
+        "y_c": line_positions[0]["y"] if line_positions else start_y,
         "rx": rx,
         "ry": ry,
         "title_center": title_center,
@@ -244,8 +236,8 @@ def generate_typewriter_overlay(output_path, layout_info, dur=9.0, fps=24, width
     rx = layout_info.get("rx", width - 300)
     ry = layout_info.get("ry", height - 200)
 
-    font_center = get_font("georgiab.ttf", center_font_size)
-    font_date = get_font("georgia.ttf", date_font_size)
+    font_center = get_font("FontdinerSwanky-Regular.ttf", center_font_size)
+    font_date = get_font("FontdinerSwanky-Regular.ttf", date_font_size)
 
     total_frames = int(dur * fps)
     f_start1 = int(2.0 * fps)
@@ -319,10 +311,12 @@ def generate_typewriter_overlay(output_path, layout_info, dur=9.0, fps=24, width
             for idx, lp in enumerate(line_positions):
                 sub = typed_lines[idx] if idx < len(typed_lines) else ""
                 if sub:
-                    draw.text((lp["x"] + 5, lp["y"] + 5), sub, font=font_center, fill=(0, 0, 0, 230))
+                    for ox, oy in [(-5, -5), (5, 5), (-5, 5), (5, -5), (-3, 0), (3, 0), (0, -3), (0, 3), (7, 7)]:
+                        draw.text((lp["x"] + ox, lp["y"] + oy), sub, font=font_center, fill=(0, 0, 0, 240))
                     draw.text((lp["x"], lp["y"]), sub, font=font_center, fill=(255, 255, 255, 255))
             if sub2:
-                draw.text((rx + 4, ry + 4), sub2, font=font_date, fill=(0, 0, 0, 220))
+                for ox, oy in [(-4, -4), (4, 4), (-4, 4), (4, -4), (5, 5)]:
+                    draw.text((rx + ox, ry + oy), sub2, font=font_date, fill=(0, 0, 0, 220))
                 draw.text((rx, ry), sub2, font=font_date, fill=(245, 235, 210, 255))
             raw = img.tobytes()
             cached_bytes[state_key] = raw
@@ -474,18 +468,21 @@ def create_title_slide(cover_path, output_path, width=3840, height=2160,
 
     # Draw final text on canvas for static slide
     draw = ImageDraw.Draw(canvas)
-    font_center = get_font("georgiab.ttf", layout_info["center_font_size"])
-    font_date = get_font("georgia.ttf", layout_info["date_font_size"])
+    font_center = get_font("FontdinerSwanky-Regular.ttf", layout_info["center_font_size"])
+    font_date = get_font("FontdinerSwanky-Regular.ttf", layout_info["date_font_size"])
     line_positions = layout_info.get("line_positions", [])
     if line_positions:
         for lp in line_positions:
-            draw.text((lp["x"] + 5, lp["y"] + 5), lp["text"], font=font_center, fill=(0, 0, 0, 230))
+            for ox, oy in [(-5, -5), (5, 5), (-5, 5), (5, -5), (-3, 0), (3, 0), (0, -3), (0, 3), (7, 7)]:
+                draw.text((lp["x"] + ox, lp["y"] + oy), lp["text"], font=font_center, fill=(0, 0, 0, 240))
             draw.text((lp["x"], lp["y"]), lp["text"], font=font_center, fill=(255, 255, 255, 255))
     elif title_center:
-        draw.text((layout_info["x_c"] + 5, layout_info["y_c"] + 5), title_center, font=font_center, fill=(0, 0, 0, 230))
+        for ox, oy in [(-5, -5), (5, 5), (-5, 5), (5, -5), (-3, 0), (3, 0), (0, -3), (0, 3), (7, 7)]:
+            draw.text((layout_info["x_c"] + ox, layout_info["y_c"] + oy), title_center, font=font_center, fill=(0, 0, 0, 240))
         draw.text((layout_info["x_c"], layout_info["y_c"]), title_center, font=font_center, fill=(255, 255, 255, 255))
     if title_bottom_right:
-        draw.text((layout_info["rx"] + 4, layout_info["ry"] + 4), title_bottom_right, font=font_date, fill=(0, 0, 0, 220))
+        for ox, oy in [(-4, -4), (4, 4), (-4, 4), (4, -4), (5, 5)]:
+            draw.text((layout_info["rx"] + ox, layout_info["ry"] + oy), title_bottom_right, font=font_date, fill=(0, 0, 0, 220))
         draw.text((layout_info["rx"], layout_info["ry"]), title_bottom_right, font=font_date, fill=(245, 235, 210, 255))
 
     canvas.save(output_path, quality=95)
@@ -604,79 +601,74 @@ def prepare_photo_layers(photo_path, bg_output_path, fg_output_path,
 
 def generate_photo_caption_overlay(caption_text, out_png, width=3840, height=2160,
                                    target_w=3000, target_h=2000, border_px=30,
-                                   font_name="georgiab.ttf"):
+                                   font_name="FontdinerSwanky-Regular.ttf"):
     """
     Renders a transparent PNG overlay at canvas resolution (width x height)
-    with caption_text centered horizontally near the bottom of the photo area,
-    inside the photo frame just above the inner border.
-    Maintains a uniform large font size across all photos and videos (portrait & landscape)
-    by intelligently wrapping into balanced multi-line text rather than shrinking font.
-    Uses multi-direction drop shadow / outline for strong legibility.
+    with caption_text placed on the bottom right of the photo area,
+    inside the photo frame.
+    Strictly 1 single line with high-contrast drop shadow for maximum legibility.
+    Uses Fontdiner Swanky font with 100% increased font size.
     """
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    if not caption_text or not caption_text.strip():
+        img.save(out_png, "PNG")
+        return out_png
+
     draw = ImageDraw.Draw(img)
 
-    # Maintain constant, legible font size across both horizontal and vertical media
-    font_size = max(54, int(target_h * 0.057))
-    font = get_font(font_name, font_size)
-
-    # Determine maximum line width:
-    # Captions wrap into 2 balanced lines when long, keeping text centered and compact
-    max_line_w = min(int(width * 0.625), 2400)
-
-    lines = wrap_text_to_lines(caption_text, font, max_line_w)
-    if not lines:
-        lines = [caption_text]
-
-    # Safety: ensure no individual line exceeds screen canvas safe bounds
-    max_screen_w = width - 200
-    for l in lines:
-        bb = font.getbbox(l)
-        lw = bb[2] - bb[0]
-        if lw > max_screen_w and lw > 0:
-            ratio = max_screen_w / lw
-            font_size = max(54, int(font_size * ratio))
-            font = get_font(font_name, font_size)
-            lines = wrap_text_to_lines(caption_text, font, max_line_w)
-            break
+    # 100% font size increase (doubled from original 38-50)
+    base_font_size = min(max(76, int(target_h * 0.052)), 100)
+    font = get_font(font_name, base_font_size)
 
     bordered_w = target_w + (border_px * 2)
     bordered_h = target_h + (border_px * 2)
     fg_x = (width - bordered_w) // 2
     fg_y = (height - bordered_h) // 2
 
-    # Calculate total height of wrapped lines
-    line_spacing = int(font_size * 0.25)
-    line_bboxes = [font.getbbox(l) for l in lines]
-    line_heights = [b[3] - b[1] for b in line_bboxes]
-    total_text_h = sum(line_heights) + line_spacing * (len(lines) - 1)
+    # Inner photo boundaries
+    inner_right = fg_x + border_px + target_w
+    inner_bottom = fg_y + border_px + target_h
 
-    # Bottom inner edge of photo is at fg_y + bordered_h - border_px
-    bottom_inner_y = fg_y + bordered_h - border_px
-    cy = bottom_inner_y - total_text_h - int(target_h * 0.035)
+    # Margins inside photo frame
+    margin_x = max(45, int(target_w * 0.04))
+    margin_y = max(45, int(target_h * 0.045))
+
+    # Restrict maximum width so it stays cleanly inside the photo frame
+    max_line_w = target_w - (margin_x * 2)
+    single_line = caption_text.strip().replace("\n", " ")
+
+    bb = font.getbbox(single_line)
+    lw = bb[2] - bb[0]
+    if lw > max_line_w and lw > 0:
+        ratio = max_line_w / lw
+        font_size = max(45, int(base_font_size * ratio))
+        font = get_font(font_name, font_size)
+        bb = font.getbbox(single_line)
+        lw = bb[2] - bb[0]
+    else:
+        font_size = base_font_size
+
+    lh = bb[3] - bb[1]
+
+    # Placed on the bottom right inside the photo frame
+    cx = inner_right - lw - margin_x
+    cy = inner_bottom - lh - margin_y
 
     # Multi-directional dark outline and shadow for maximum contrast
     shadow_offsets = [
-        (-4, -4), (-4, 0), (-4, 4),
-        (0, -4),           (0, 4),
-        (4, -4),  (4, 0),  (4, 4),
-        (-3, -3), (3, -3), (-3, 3), (3, 3),
+        (-6, -6), (-6, 0), (-6, 6),
+        (0, -6),           (0, 6),
+        (6, -6),  (6, 0),  (6, 6),
+        (-4, -4), (4, -4), (-4, 4), (4, 4),
         (-2, -2), (2, -2), (-2, 2), (2, 2),
-        (5, 5),   (6, 6)
+        (7, 7),   (8, 8)
     ]
 
-    curr_y = cy
-    for l, lh in zip(lines, line_heights):
-        bb = font.getbbox(l)
-        lw = bb[2] - bb[0]
-        cx = (width - lw) // 2
+    for ox, oy in shadow_offsets:
+        draw.text((cx + ox, cy + oy), single_line, font=font, fill=(0, 0, 0, 240))
 
-        for ox, oy in shadow_offsets:
-            draw.text((cx + ox, curr_y + oy), l, font=font, fill=(0, 0, 0, 240))
-
-        # Foreground pure white text
-        draw.text((cx, curr_y), l, font=font, fill=(255, 255, 255, 255))
-        curr_y += lh + line_spacing
+    # Foreground pure white text
+    draw.text((cx, cy), single_line, font=font, fill=(255, 255, 255, 255))
 
     img.save(out_png, "PNG")
     return out_png
