@@ -297,7 +297,17 @@ def process_music_directory(base_dir, dry_run=False, pattern="{artist} - {album}
             if not clean_alb: clean_alb = "Unknown Album"
             if not clean_tit: clean_tit = "Unknown Track"
 
+            # Enforce max filename length (NTFS limit is 255 chars; cap at 200 chars to prevent OS errors)
+            max_name_len = 200
+            overhead = len(pattern.format(artist=clean_art, album=clean_alb, title="")) + len(ext)
+            if overhead < max_name_len and (overhead + len(clean_tit)) > max_name_len:
+                max_tit_len = max_name_len - overhead
+                clean_tit = clean_tit[:max_tit_len].rstrip(' -.,_')
+
             target_base = pattern.format(artist=clean_art, album=clean_alb, title=clean_tit)
+            if len(target_base) + len(ext) > max_name_len:
+                target_base = target_base[:max_name_len - len(ext)].rstrip(' -.,_')
+
             target_name = f"{target_base}{ext}"
             folder_planned[target_name].append((file_path, f))
 
