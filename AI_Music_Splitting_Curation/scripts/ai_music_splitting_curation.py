@@ -172,6 +172,26 @@ def clean_album_name(raw_name):
         return 'THREE CHASSIS - Electric Love'
     if 'Top 10 Blues Rock Songs' in s:
         return 'Rhett Veylor Blues - Top 10 Blues Rock Songs Of All Time'
+    if 'The Glass Engine Becomes' in s:
+        return 'RetroForge Records - The Glass Engine Becomes'
+    if 'Artist and the Machine' in s:
+        return 'Kelly Boesch - Artist and the Machine'
+    if 'I Miss Myself With You' in s:
+        return 'Psychedelic Room - I Miss Myself With You'
+    if 'Miss Tambourine' in s:
+        return 'The Psychedelic Blondes - Miss Tambourine'
+    if 'Nasmet Saiffe' in s:
+        return 'RezanMood - Nasmet Saiffe'
+    if 'Saudades dos' in s:
+        return 'Saudades dos Açores'
+    if 'Sunset By The Sea' in s:
+        return 'Sunset By The Sea'
+    if 'The Eden Transmission' in s:
+        return 'The Eden Transmission'
+    if 'The Genesis Horizon' in s:
+        return 'Dan Flare - The Genesis Horizon'
+    if 'The Lost Colony of Roanoke' in s or 'The Hollow Meridian' in s:
+        return 'The Lost Colony of Roanoke – The Hollow Meridian'
     
     # General patterns
     s = re.sub(r'\[Full Album\]', '', s, flags=re.I)
